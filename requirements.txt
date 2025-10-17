@@ -1,0 +1,24 @@
+# Core
+python-dotenv
+pydantic
+dataclasses-json
+typing-extensions
+
+# LangChain e LangGraph
+langchain
+langchain-core
+langchain-community
+langgraph
+
+# Gemma / Gemini (via Google)
+langchain-google-genai
+
+# Ferramentas utilitárias
+requests
+pandas
+sqlalchemy
+matplotlib
+
+# Logs e Dev
+rich
+tqdm
