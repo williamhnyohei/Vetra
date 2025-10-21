@@ -1,0 +1,131 @@
+# Template Repository Configuration
+# This file configures Vetra as a template repository
+
+# Template Settings
+template:
+  enabled: true
+  description: "Chrome Extension template for Solana transaction analysis with fraud detection"
+  topics:
+    - "chrome-extension-template"
+    - "solana"
+    - "blockchain"
+    - "security"
+    - "fraud-detection"
+    - "react"
+    - "typescript"
+    - "anchor"
+    - "web3"
+
+# Template Files to Include
+include_files:
+  - "frontend/extension/"
+  - "backend/programs/"
+  - "docs/"
+  - ".github/"
+  - "package.json"
+  - "pnpm-workspace.yaml"
+  - "tsconfig.json"
+  - "README.md"
+  - "CONTRIBUTING.md"
+  - "CODE_OF_CONDUCT.md"
+  - "SECURITY.md"
+  - "CHANGELOG.md"
+  - "LICENSE"
+
+# Template Files to Exclude
+exclude_files:
+  - "node_modules/"
+  - "dist/"
+  - "build/"
+  - ".env"
+  - ".env.local"
+  - ".env.production"
+  - "*.log"
+  - ".DS_Store"
+  - "Thumbs.db"
+
+# Template Variables
+variables:
+  project_name: "{{PROJECT_NAME}}"
+  project_description: "{{PROJECT_DESCRIPTION}}"
+  author_name: "{{AUTHOR_NAME}}"
+  author_email: "{{AUTHOR_EMAIL}}"
+  github_username: "{{GITHUB_USERNAME}}"
+  repository_url: "{{REPOSITORY_URL}}"
+
+# Template Instructions
+instructions:
+  setup:
+    - "Clone the repository"
+    - "Run 'pnpm install' to install dependencies"
+    - "Copy .env.example to .env and configure"
+    - "Run 'pnpm dev' to start development"
+  
+  customization:
+    - "Update package.json with your project details"
+    - "Modify README.md with your project information"
+    - "Configure .github/workflows/ for your CI/CD needs"
+    - "Update manifest.json with your extension details"
+    - "Customize the UI components in frontend/extension/src/"
+    - "Modify the Solana programs in backend/programs/"
+
+# Template Documentation
+documentation:
+  readme: "README.md"
+  contributing: "CONTRIBUTING.md"
+  code_of_conduct: "CODE_OF_CONDUCT.md"
+  security: "SECURITY.md"
+  changelog: "CHANGELOG.md"
+  architecture: "docs/ARCHITECTURE.md"
+  development: "docs/DEVELOPMENT.md"
+
+# Template Features
+features:
+  chrome_extension: true
+  solana_integration: true
+  fraud_detection: true
+  risk_analysis: true
+  on_chain_attestations: true
+  reputation_system: true
+  privacy_first: true
+  multi_language: true
+  dark_theme: true
+  responsive_design: true
+
+# Template Tech Stack
+tech_stack:
+  frontend:
+    - "React 18"
+    - "TypeScript"
+    - "Vite"
+    - "TailwindCSS"
+    - "Zustand"
+    - "Chrome Extension MV3"
+  
+  backend:
+    - "Anchor 0.29.0"
+    - "Rust"
+    - "Solana"
+    - "Solana CLI"
+  
+  tools:
+    - "pnpm"
+    - "ESLint"
+    - "Prettier"
+    - "Jest"
+    - "GitHub Actions"
+    - "Dependabot"
+
+# Template License
+license:
+  type: "MIT"
+  file: "LICENSE"
+  description: "MIT License - see LICENSE file for details"
+
+# Template Support
+support:
+  documentation: "https://docs.vetra.com"
+  issues: "https://github.com/williamhnyohei/Vetra/issues"
+  discussions: "https://github.com/williamhnyohei/Vetra/discussions"
+  discord: "https://discord.gg/vetra"
+  email: "support@vetra.com"
