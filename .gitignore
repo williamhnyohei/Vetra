@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+.nyc_output/
+
+# Production
+build/
+dist/
+*.crx
+*.pem
+
+# Misc
+.DS_Store
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*~
+
+# Anchor / Solana
+programs/target/
+programs/.anchor/
+programs/test-ledger/
+backend/programs/target/
+backend/programs/.anchor/
+backend/programs/test-ledger/
+.anchor/
+target/
+test-ledger/
+
+# Build artifacts
+*.so
+*.wasm
+
+# Solana
+.config/
+
+# Design files (keep in repo but not built)
+# design/
