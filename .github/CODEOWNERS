@@ -1,0 +1,49 @@
+# Code Owners
+# This file defines who is responsible for different parts of the codebase
+
+# Global owners
+* @williamhnyohei
+
+# Frontend Extension
+/frontend/extension/ @williamhnyohei
+/frontend/extension/src/ @williamhnyohei
+/frontend/extension/public/ @williamhnyohei
+/frontend/extension/package.json @williamhnyohei
+/frontend/extension/vite.config.ts @williamhnyohei
+/frontend/extension/tailwind.config.js @williamhnyohei
+/frontend/extension/tsconfig.json @williamhnyohei
+
+# Backend
+/backend/ @williamhnyohei
+/backend/programs/ @williamhnyohei
+
+# Documentation
+*.md @williamhnyohei
+/docs/ @williamhnyohei
+README.md @williamhnyohei
+CONTRIBUTING.md @williamhnyohei
+SECURITY.md @williamhnyohei
+CODE_OF_CONDUCT.md @williamhnyohei
+CHANGELOG.md @williamhnyohei
+
+# Configuration files
+package.json @williamhnyohei
+pnpm-workspace.yaml @williamhnyohei
+tsconfig.json @williamhnyohei
+.eslintrc.json @williamhnyohei
+.prettierrc @williamhnyohei
+
+# GitHub workflows
+/.github/ @williamhnyohei
+/.github/workflows/ @williamhnyohei
+/.github/ISSUE_TEMPLATE/ @williamhnyohei
+
+# Assets
+/frontend/assets/ @williamhnyohei
+/frontend/extension/public/assets/ @williamhnyohei
+
+# Tests
+**/*.test.ts @williamhnyohei
+**/*.test.tsx @williamhnyohei
+**/*.spec.ts @williamhnyohei
+**/*.spec.tsx @williamhnyohei

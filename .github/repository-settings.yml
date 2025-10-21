@@ -1,0 +1,123 @@
+# Repository Settings Configuration
+# This file documents the recommended repository settings for Vetra
+
+# General Settings
+name: "Vetra"
+description: "Chrome Extension (MV3) que analisa transações Solana antes de assinar. Análise local com heurísticas, risk score visual e attestations on-chain via Anchor com sistema de reputação. Privacy-first por padrão."
+homepage: "https://vetra.com"
+topics:
+  - "chrome-extension"
+  - "solana"
+  - "blockchain"
+  - "security"
+  - "fraud-detection"
+  - "rust"
+  - "react"
+  - "typescript"
+  - "anchor"
+  - "web3"
+
+# Features
+features:
+  issues: true
+  projects: true
+  wiki: false
+  discussions: true
+  packages: false
+  pages: true
+
+# Branch Protection Rules
+branch_protection:
+  main:
+    required_status_checks:
+      strict: true
+      contexts:
+        - "CI/CD Pipeline"
+        - "Linting"
+        - "Type Checking"
+        - "Testing"
+        - "Build"
+    enforce_admins: true
+    required_pull_request_reviews:
+      required_approving_review_count: 1
+      dismiss_stale_reviews: true
+      require_code_owner_reviews: true
+    restrictions:
+      users: []
+      teams: []
+      apps: []
+
+# Security Settings
+security:
+  vulnerability_alerts: true
+  secret_scanning: true
+  secret_scanning_push_protection: true
+  dependency_graph: true
+  code_scanning: true
+
+# Notifications
+notifications:
+  security_advisories: true
+  dependency_updates: true
+  discussions: true
+  issues: true
+  pull_requests: true
+
+# Automation
+automation:
+  auto_merge: true
+  delete_head_branches: true
+  squash_merge: true
+  rebase_merge: true
+  merge_commit: false
+
+# Labels
+labels:
+  - name: "bug"
+    color: "d73a4a"
+    description: "Something isn't working"
+  - name: "enhancement"
+    color: "a2eeef"
+    description: "New feature or request"
+  - name: "documentation"
+    color: "0075ca"
+    description: "Improvements or additions to documentation"
+  - name: "good first issue"
+    color: "7057ff"
+    description: "Good for newcomers"
+  - name: "help wanted"
+    color: "008672"
+    description: "Extra attention is needed"
+  - name: "priority: high"
+    color: "ff0000"
+    description: "High priority issue"
+  - name: "priority: medium"
+    color: "ffa500"
+    description: "Medium priority issue"
+  - name: "priority: low"
+    color: "00ff00"
+    description: "Low priority issue"
+  - name: "frontend"
+    color: "61dafb"
+    description: "Frontend related changes"
+  - name: "backend"
+    color: "f7df1e"
+    description: "Backend related changes"
+  - name: "security"
+    color: "ff6b6b"
+    description: "Security related issue"
+  - name: "dependencies"
+    color: "0366d6"
+    description: "Dependency updates"
+  - name: "ci"
+    color: "28a745"
+    description: "CI/CD related changes"
+  - name: "chrome-extension"
+    color: "4285f4"
+    description: "Chrome Extension related"
+  - name: "solana"
+    color: "9945ff"
+    description: "Solana blockchain related"
+  - name: "anchor"
+    color: "00d4aa"
+    description: "Anchor framework related"

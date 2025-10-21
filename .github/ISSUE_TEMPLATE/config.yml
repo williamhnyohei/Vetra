@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🚀 GitHub Community Support
+    url: https://github.com/williamhnyohei/Vetra/discussions
+    about: Please ask and answer questions here.
+  - name: 💬 Discord Community
+    url: https://discord.gg/vetra
+    about: Join our Discord server for real-time support and discussions.
+  - name: 📚 Documentation
+    url: https://docs.vetra.com
+    about: Check our documentation for guides and API references.
+  - name: 🔒 Security Issues
+    url: https://github.com/williamhnyohei/Vetra/security/advisories/new
+    about: Please report security vulnerabilities privately.
