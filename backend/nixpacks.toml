@@ -1,0 +1,13 @@
+# Nixpacks configuration for Railway deployment
+[phases.setup]
+nixPkgs = ["nodejs-18_x", "postgresql"]
+
+[phases.install]
+cmds = ["npm install"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm run db:migrate && npm start"
+

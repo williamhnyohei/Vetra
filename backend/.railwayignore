@@ -1,0 +1,50 @@
+# Files and directories to ignore during Railway deployment
+
+# Dependencies
+node_modules/
+
+# Testing
+coverage/
+test-results/
+*.test.js
+*.spec.js
+__tests__/
+
+# Development
+.env.local
+.env.development
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker (if using Nixpacks)
+docker-compose.yml
+docker-compose.prod.yml
+Dockerfile.dev
+
+# Documentation
+README.md
+docs/
+
+# Scripts
+scripts/setup.sh
+
+# Solana Programs (not needed in Node.js deploy)
+programs/
+
+# Examples
+examples/
+
