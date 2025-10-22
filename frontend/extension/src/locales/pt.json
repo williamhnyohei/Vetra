@@ -1,0 +1,61 @@
+{
+  "welcome": {
+    "title": "Bem-vindo ao Vetra",
+    "subtitle": "Sua extensão de proteção para transações cripto",
+    "googleButton": "Entrar com Google",
+    "guestButton": "Continuar como visitante",
+    "disclaimer": "Vetra ajuda a interceptar transações de alto risco — Suas decisões permanecem suas."
+  },
+  "common": {
+    "vetra": "Vetra",
+    "tagline": "Seu antivírus para cripto",
+    "beginnerMode": "Modo Iniciante",
+    "yes": "Sim",
+    "no": "Não",
+    "proceed": "Prosseguir",
+    "cancel": "Cancelar",
+    "simulate": "Simular com valor mínimo",
+    "report": "Reportar suspeita"
+  },
+  "navigation": {
+    "home": "Início",
+    "history": "Histórico",
+    "settings": "Ajustes"
+  },
+  "risk": {
+    "low": "Risco Baixo",
+    "medium": "Risco Médio",
+    "high": "Risco Alto",
+    "score": "Score de Risco",
+    "whyThisScore": "Por que este score?",
+    "whatToDo": "O que fazer?"
+  },
+  "transaction": {
+    "type": "Tipo",
+    "amount": "Valor",
+    "to": "Para",
+    "time": "Horário",
+    "pending": "Transação Pendente",
+    "approved": "Aprovada",
+    "rejected": "Rejeitada"
+  },
+  "explanation": {
+    "title": "Entenda sua transação",
+    "transfer": "Você está transferindo {amount} {token} de sua carteira ({from}) para a carteira de destino ({to}).",
+    "swap": "Você está trocando {amount} {token} por outro token. Isso envolve interagir com um contrato de troca descentralizado.",
+    "approve": "Você está dando permissão para um aplicativo (contrato) gastar seus {token} em seu nome. Cuidado com permissões ilimitadas!",
+    "default": "Esta é uma transação do tipo \"{type}\". Ela envolve {amount} {token} e interage com o endereço {to}."
+  },
+  "feedback": {
+    "title": "Este alerta foi útil?",
+    "thankYou": "Obrigado pelo feedback!"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "beginnerMode": "Modo Iniciante",
+    "riskThreshold": "Limite de Alerta de Risco",
+    "autoBlock": "Bloquear automaticamente transações de alto risco",
+    "language": "Idioma",
+    "privacy": "Privacidade by Design - Não coletamos seed, wallet ou dados pessoais"
+  }
+}

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=420, height=600, initial-scale=1.0" />
+    <title>Vetra - Seu antivírus para cripto</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      html {
+        width: 100vw;
+        height: 100vh;
+        background-color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      body {
+        width: 420px;
+        height: 600px;
+        overflow: hidden;
+        font-family: Arial, sans-serif;
+        background-color: white;
+        margin: 0;
+        padding: 0;
+      }
+      
+      #root {
+        width: 420px;
+        height: 600px;
+        overflow: hidden;
+        border-radius: 14px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      }
+      
+      /* Garantir que o body também tenha border radius */
+      body {
+        border-radius: 14px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/popup/index.tsx"></script>
+  </body>
+</html>

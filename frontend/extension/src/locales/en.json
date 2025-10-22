@@ -1,0 +1,61 @@
+{
+  "welcome": {
+    "title": "Welcome to Vetra",
+    "subtitle": "Your protection extension for crypto transactions",
+    "googleButton": "Sign in with Google",
+    "guestButton": "Continue as guest",
+    "disclaimer": "Vetra helps intercept high-risk transactions — Your decisions remain yours."
+  },
+  "common": {
+    "vetra": "Vetra",
+    "tagline": "Your crypto antivirus",
+    "beginnerMode": "Beginner Mode",
+    "yes": "Yes",
+    "no": "No",
+    "proceed": "Proceed",
+    "cancel": "Cancel",
+    "simulate": "Simulate with minimum value",
+    "report": "Report suspicion"
+  },
+  "navigation": {
+    "home": "Home",
+    "history": "History",
+    "settings": "Settings"
+  },
+  "risk": {
+    "low": "Low Risk",
+    "medium": "Medium Risk", 
+    "high": "High Risk",
+    "score": "Risk Score",
+    "whyThisScore": "Why this score?",
+    "whatToDo": "What to do?"
+  },
+  "transaction": {
+    "type": "Type",
+    "amount": "Amount",
+    "to": "To",
+    "time": "Time",
+    "pending": "Pending Transaction",
+    "approved": "Approved",
+    "rejected": "Rejected"
+  },
+  "explanation": {
+    "title": "Understand your transaction",
+    "transfer": "You are transferring {amount} {token} from your wallet ({from}) to the destination wallet ({to}).",
+    "swap": "You are swapping {amount} {token} for another token. This involves interacting with a decentralized exchange contract.",
+    "approve": "You are giving permission for an application (contract) to spend your {token} on your behalf. Be careful with unlimited permissions!",
+    "default": "This is a \"{type}\" transaction. It involves {amount} {token} and interacts with address {to}."
+  },
+  "feedback": {
+    "title": "Was this alert helpful?",
+    "thankYou": "Thank you for your feedback!"
+  },
+  "settings": {
+    "title": "Settings",
+    "beginnerMode": "Beginner Mode",
+    "riskThreshold": "Risk Alert Threshold",
+    "autoBlock": "Auto-block high-risk transactions",
+    "language": "Language",
+    "privacy": "Privacy by Design - We don't collect your seed, wallet or personal data"
+  }
+}
