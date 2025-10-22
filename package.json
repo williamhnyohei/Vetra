@@ -1,0 +1,44 @@
+{
+  "name": "vetra-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Vetra - Chrome Extension for Solana Transaction Risk Assessment",
+  "author": "Vetra Team",
+  "license": "MIT",
+  "scripts": {
+    "setup": "node scripts/setup.js",
+    "setup:backend": "cd backend && pnpm install && pnpm run db:migrate",
+    "setup:frontend": "cd frontend/extension && pnpm install",
+    "setup:docker": "cd backend && docker-compose up -d",
+    "dev": "pnpm --filter @vetra/extension dev",
+    "dev:backend": "cd backend && pnpm run dev",
+    "dev:frontend": "cd frontend/extension && pnpm run dev",
+    "build": "pnpm -r build",
+    "build:frontend": "pnpm --filter @vetra/extension build",
+    "build:backend": "cd backend && pnpm run build",
+    "test": "pnpm -r test",
+    "test:frontend": "pnpm --filter @vetra/extension test",
+    "test:backend": "cd backend && pnpm test",
+    "test:coverage": "pnpm -r test:coverage",
+    "lint": "pnpm -r lint",
+    "lint:fix": "pnpm -r lint:fix",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "clean": "pnpm -r clean && rm -rf node_modules",
+    "db:migrate": "cd backend && pnpm run db:migrate",
+    "db:seed": "cd backend && pnpm run db:seed",
+    "db:rollback": "cd backend && pnpm run db:rollback",
+    "docker:up": "cd backend && docker-compose up -d",
+    "docker:down": "cd backend && docker-compose down",
+    "docker:logs": "cd backend && docker-compose logs -f"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "prettier": "^3.1.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.12.0"
+}
