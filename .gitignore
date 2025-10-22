@@ -92,6 +92,9 @@ yarn.lock
 # Output of 'npm pack'
 *.tgz
 
+# Yarn Integrity file
+.yarn-integrity
+
 # Chrome Extension
 frontend/extension/dist/
 frontend/extension/build/
