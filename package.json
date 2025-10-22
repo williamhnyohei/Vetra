@@ -29,7 +29,11 @@
     "db:rollback": "cd backend && pnpm run db:rollback",
     "docker:up": "cd backend && docker-compose up -d",
     "docker:down": "cd backend && docker-compose down",
-    "docker:logs": "cd backend && docker-compose logs -f"
+    "docker:logs": "cd backend && docker-compose logs -f",
+    "deploy:railway": "railway up",
+    "deploy:backend": "cd backend && railway up",
+    "railway:logs": "railway logs",
+    "railway:status": "railway status"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
