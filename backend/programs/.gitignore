@@ -1,0 +1,13 @@
+# Anchor
+target/
+.anchor/
+test-ledger/
+.DS_Store
+
+# Build artifacts
+*.so
+*.wasm
+
+# Node (for tests)
+node_modules/
+
