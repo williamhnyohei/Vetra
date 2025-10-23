@@ -14,7 +14,9 @@ const connection = new Connection(
 );
 
 // Attestation program ID (deployed program)
-const ATTESTATION_PROGRAM_ID = new PublicKey(process.env.ATTESTATION_PROGRAM_ID);
+const ATTESTATION_PROGRAM_ID = new PublicKey(
+  process.env.ATTESTATION_PROGRAM_ID || '11111111111111111111111111111111' // Default to system program if not set
+);
 
 /**
  * Create attestation on-chain
