@@ -129,10 +129,10 @@ async function startServer() {
       .then(() => logger.info('Database connected successfully'))
       .catch((error) => logger.warn('Database connection failed:', error.message));
 
-    // Try to connect to Redis (non-blocking) - disabled for now
-    // connectRedis()
-    //   .then(() => logger.info('Redis connected successfully'))
-    //   .catch((error) => logger.warn('Redis connection failed:', error.message));
+    // Try to connect to Redis (non-blocking)
+    connectRedis()
+      .then(() => logger.info('Redis connected successfully'))
+      .catch((error) => logger.warn('Redis connection failed:', error.message));
 
     // Graceful shutdown
     process.on('SIGTERM', () => {

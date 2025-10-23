@@ -31,27 +31,38 @@ const redisConfig = process.env.REDIS_URL || {
 
 async function connectRedis() {
   try {
+    console.log('🔧 Redis Config:', {
+      hasRedisUrl: !!process.env.REDIS_URL,
+      redisUrl: process.env.REDIS_URL ? 'REDIS_URL is set' : 'REDIS_URL not set',
+      config: redisConfig
+    });
+    
     redisClient = redis.createClient(redisConfig);
     
     redisClient.on('error', (err) => {
+      console.error('❌ Redis Client Error:', err.message);
       logger.error('Redis Client Error:', err);
     });
 
     redisClient.on('connect', () => {
+      console.log('✅ Redis client connected');
       logger.info('✅ Redis client connected');
     });
 
     redisClient.on('ready', () => {
+      console.log('✅ Redis client ready');
       logger.info('✅ Redis client ready');
     });
 
     redisClient.on('end', () => {
+      console.log('Redis client disconnected');
       logger.info('Redis client disconnected');
     });
 
     await redisClient.connect();
     return redisClient;
   } catch (error) {
+    console.error('❌ Redis connection failed:', error.message);
     logger.error('❌ Redis connection failed:', error.message);
     throw error;
   }
