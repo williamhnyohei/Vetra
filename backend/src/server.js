@@ -106,23 +106,24 @@ app.use(errorHandler);
 // Initialize server
 async function startServer() {
   try {
-    // Connect to database
-    await connectDatabase();
-    logger.info('Database connected successfully');
-
-    // Connect to Redis
-    await connectRedis();
-    logger.info('Redis connected successfully');
-
-    // Setup WebSocket
+    // Start server first (don't wait for DB/Redis connections)
     const server = setupWebSocket(app);
     
-    // Start server
     server.listen(PORT, () => {
       logger.info(`🚀 Vetra API Server running on port ${PORT}`);
       logger.info(`📊 Environment: ${process.env.NODE_ENV}`);
       logger.info(`🔗 Health check: http://localhost:${PORT}/api/health`);
     });
+
+    // Try to connect to database (non-blocking)
+    connectDatabase()
+      .then(() => logger.info('Database connected successfully'))
+      .catch((error) => logger.warn('Database connection failed:', error.message));
+
+    // Try to connect to Redis (non-blocking)
+    connectRedis()
+      .then(() => logger.info('Redis connected successfully'))
+      .catch((error) => logger.warn('Redis connection failed:', error.message));
 
     // Graceful shutdown
     process.on('SIGTERM', () => {
