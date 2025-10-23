@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
+    "start:railway": "npm run db:migrate || echo 'Migration failed, continuing...' && npm start",
     "build": "echo 'No build step required'",
     "test": "jest",
     "test:watch": "jest --watch",
