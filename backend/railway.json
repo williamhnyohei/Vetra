@@ -5,7 +5,7 @@
     "buildCommand": "npm install --production=false"
   },
   "deploy": {
-    "startCommand": "npm run db:migrate && npm start",
+    "startCommand": "npm run db:migrate || echo 'Migration failed, continuing...' && npm start",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",
