@@ -8,7 +8,7 @@ exports.up = function(knex) {
     table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
     table.uuid('user_id').references('id').inTable('users').onDelete('CASCADE');
     table.string('signature').unique();
-    table.string('transaction_hash').index();
+    table.string('transaction_hash');
     table.enum('type', ['transfer', 'swap', 'approve', 'mint', 'burn', 'other']).notNullable();
     table.string('from_address').notNullable();
     table.string('to_address').notNullable();
@@ -26,16 +26,18 @@ exports.up = function(knex) {
     table.timestamp('analyzed_at').defaultTo(knex.fn.now());
     table.timestamp('created_at').defaultTo(knex.fn.now());
     table.timestamp('updated_at').defaultTo(knex.fn.now());
-    
-    // Indexes
-    table.index(['user_id']);
-    table.index(['signature']);
-    table.index(['transaction_hash']);
-    table.index(['risk_score']);
-    table.index(['risk_level']);
-    table.index(['status']);
-    table.index(['analyzed_at']);
-    table.index(['created_at']);
+  }).then(() => {
+    // Create indexes separately to avoid conflicts
+    return knex.schema.raw(`
+      CREATE INDEX IF NOT EXISTS transactions_user_id_index ON transactions (user_id);
+      CREATE INDEX IF NOT EXISTS transactions_signature_index ON transactions (signature);
+      CREATE INDEX IF NOT EXISTS transactions_transaction_hash_index ON transactions (transaction_hash);
+      CREATE INDEX IF NOT EXISTS transactions_risk_score_index ON transactions (risk_score);
+      CREATE INDEX IF NOT EXISTS transactions_risk_level_index ON transactions (risk_level);
+      CREATE INDEX IF NOT EXISTS transactions_status_index ON transactions (status);
+      CREATE INDEX IF NOT EXISTS transactions_analyzed_at_index ON transactions (analyzed_at);
+      CREATE INDEX IF NOT EXISTS transactions_created_at_index ON transactions (created_at);
+    `);
   });
 };
 
