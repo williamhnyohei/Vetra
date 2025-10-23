@@ -106,10 +106,19 @@ app.use(errorHandler);
 // Initialize server
 async function startServer() {
   try {
+    console.log('🔧 Starting server initialization...');
+    console.log('🔧 Environment:', process.env.NODE_ENV);
+    console.log('🔧 Port:', PORT);
+    
     // Start server first (don't wait for DB/Redis connections)
+    console.log('🔧 Setting up WebSocket...');
     const server = setupWebSocket(app);
     
+    console.log('🔧 Starting HTTP server...');
     server.listen(PORT, () => {
+      console.log(`🚀 Vetra API Server running on port ${PORT}`);
+      console.log(`📊 Environment: ${process.env.NODE_ENV}`);
+      console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
       logger.info(`🚀 Vetra API Server running on port ${PORT}`);
       logger.info(`📊 Environment: ${process.env.NODE_ENV}`);
       logger.info(`🔗 Health check: http://localhost:${PORT}/api/health`);
