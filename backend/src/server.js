@@ -144,6 +144,9 @@ async function startServer() {
     });
 
   } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    console.error('❌ Error details:', error.message);
+    console.error('❌ Stack trace:', error.stack);
     logger.error('Failed to start server:', error);
     process.exit(1);
   }
