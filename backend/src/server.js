@@ -22,7 +22,7 @@ const transactionRoutes = require('./routes/transactions');
 const attestationRoutes = require('./routes/attestations');
 const userRoutes = require('./routes/users');
 const settingsRoutes = require('./routes/settings');
-const healthRoutes = require('./routes/health');
+const healthRoutes = require('./routes/health-simple');
 
 // Import middleware
 const { errorHandler } = require('./middleware/errorHandler');
