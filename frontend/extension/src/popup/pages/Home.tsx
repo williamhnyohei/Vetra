@@ -1,4 +1,6 @@
 import React from 'react';
+import { useLanguageStore } from '../../store/language-store';
+import { t } from '../../i18n';
 
 interface HomeProps {
   onNavigateToAnalysis?: () => void;
@@ -10,6 +12,8 @@ interface HomeProps {
 }
 
 const Home: React.FC<HomeProps> = ({ onNavigateToAnalysis, onNavigateToConnectWallet, onNavigateToPlans, onNavigateToSettings, onNavigateToHistory, onNavigateToTransaction }) => {
+  const { language } = useLanguageStore();
+  
   return (
     <div className="w-full h-full bg-dark-bg text-dark-text p-4 space-y-4 overflow-y-auto">
       {/* Header */}
@@ -35,7 +39,7 @@ const Home: React.FC<HomeProps> = ({ onNavigateToAnalysis, onNavigateToConnectWa
                 color: '#E6E6E6'
               }}
             >
-              Status
+              {t('home.status', language)}
             </span>
             <div className="flex items-center gap-1">
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -49,7 +53,7 @@ const Home: React.FC<HomeProps> = ({ onNavigateToAnalysis, onNavigateToConnectWa
                   color: '#E6E6E6'
                 }}
               >
-                Protected
+                {t('home.protected', language)}
               </span>
             </div>
           </div>
@@ -69,7 +73,7 @@ const Home: React.FC<HomeProps> = ({ onNavigateToAnalysis, onNavigateToConnectWa
             }}
             onClick={onNavigateToConnectWallet}
           >
-            Connected wallet
+            {t('home.connectedWallet', language)}
           </button>
           <button 
             className="px-3 py-1 rounded-full"
@@ -84,7 +88,7 @@ const Home: React.FC<HomeProps> = ({ onNavigateToAnalysis, onNavigateToConnectWa
             }}
             onClick={onNavigateToPlans}
           >
-            Free
+            {t('home.free', language)}
           </button>
           <button 
             className="p-2 rounded-full"
@@ -123,7 +127,7 @@ const Home: React.FC<HomeProps> = ({ onNavigateToAnalysis, onNavigateToConnectWa
                 marginBottom: '4px'
               }}
             >
-              High-risk transaction detected
+              {t('home.highRiskDetected', language)}
             </h3>
             <p 
               style={{
@@ -163,7 +167,7 @@ const Home: React.FC<HomeProps> = ({ onNavigateToAnalysis, onNavigateToConnectWa
               alt="Analysis"
               className="w-5 h-5"
             />
-            View analysis
+            {t('home.viewAnalysis', language)}
           </button>
           <button 
             className="flex-1 rounded-lg flex items-center justify-center gap-2 transition-colors"
@@ -185,7 +189,7 @@ const Home: React.FC<HomeProps> = ({ onNavigateToAnalysis, onNavigateToConnectWa
               alt="Block"
               className="w-5 h-5"
             />
-            Block
+            {t('home.block', language)}
           </button>
         </div>
       </div>
@@ -203,7 +207,7 @@ const Home: React.FC<HomeProps> = ({ onNavigateToAnalysis, onNavigateToConnectWa
             marginBottom: '0.75rem'
           }}
         >
-          Recent Activity
+          {t('home.recentActivity', language)}
         </h2>
         <div className="space-y-3">
           {/* Transaction 1 - Blocked */}
@@ -362,7 +366,7 @@ const Home: React.FC<HomeProps> = ({ onNavigateToAnalysis, onNavigateToConnectWa
             alt="History"
             className="w-5 h-5"
           />
-          <span>History</span>
+          <span>{t('home.history', language)}</span>
         </button>
         <button 
           className="flex-1 bg-dark-card rounded-lg p-4 flex items-center justify-center gap-2 hover:bg-dark-card/80 transition-colors"
@@ -381,7 +385,7 @@ const Home: React.FC<HomeProps> = ({ onNavigateToAnalysis, onNavigateToConnectWa
             alt="Plans"
             className="w-5 h-5"
           />
-          <span>Plans</span>
+          <span>{t('home.plans', language)}</span>
         </button>
       </div>
     </div>

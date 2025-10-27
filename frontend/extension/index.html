@@ -13,38 +13,60 @@
       }
       
       html {
-        width: 100vw;
-        height: 100vh;
-        background-color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        width: 420px !important;
+        height: 600px !important;
+        background-color: #121212 !important;
+        overflow: hidden !important;
+        margin: 0 !important;
+        padding: 0 !important;
       }
       
       body {
-        width: 420px;
-        height: 600px;
-        overflow: hidden;
+        width: 420px !important;
+        height: 600px !important;
+        overflow: hidden !important;
         font-family: Arial, sans-serif;
-        background-color: white;
-        margin: 0;
-        padding: 0;
+        background-color: #121212 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border-radius: 14px !important;
       }
       
       #root {
-        width: 420px;
-        height: 600px;
-        overflow: hidden;
-        border-radius: 14px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        width: 420px !important;
+        height: 600px !important;
+        overflow: hidden !important;
+        border-radius: 14px !important;
+        background-color: #121212 !important;
+        display: flex !important;
+        flex-direction: column !important;
       }
       
-      /* Garantir que o body também tenha border radius */
-      body {
-        border-radius: 14px;
-        overflow: hidden;
+      /* Remover qualquer scrollbar */
+      ::-webkit-scrollbar {
+        display: none !important;
+      }
+      
+      /* Garantir que não há bordas azuis do Chrome */
+      * {
+        outline: none !important;
+        border: none !important;
+      }
+      
+      *:focus {
+        outline: none !important;
+        border: none !important;
+        box-shadow: none !important;
+      }
+      
+      /* Garantir que o conteúdo não seja cortado */
+      .container, .app, .main {
+        width: 420px !important;
+        height: 600px !important;
+        overflow: hidden !important;
       }
     </style>
+    <link rel="stylesheet" href="/src/styles/extension-override.css">
   </head>
   <body>
     <div id="root"></div>

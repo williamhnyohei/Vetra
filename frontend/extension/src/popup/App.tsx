@@ -7,13 +7,20 @@ import TransactionAnalysis from './pages/TransactionAnalysis'; // Import Transac
 import ConnectWallet from './pages/ConnectWallet'; // Import ConnectWallet component
 import Plans from './pages/Plans'; // Import Plans component
 import { useAuthStore } from '../store/auth-store'; // Import auth store
+import { useThemeStore } from '../store/theme-store'; // Import theme store
 
 type Page = 'welcome' | 'home' | 'history' | 'settings' | 'transaction-analysis' | 'connect-wallet' | 'plans';
 
 function App() {
   const { isAuthenticated, isLoading, checkAuthStatus } = useAuthStore();
+  const { theme, applyTheme } = useThemeStore();
   const [currentPage, setCurrentPage] = useState<Page>('welcome');
   const [selectedTransactionId, setSelectedTransactionId] = useState<string>('');
+
+  // Apply theme on mount
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme, applyTheme]);
 
   // Check authentication status on app load
   useEffect(() => {

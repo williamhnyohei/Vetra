@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import AuthService from '../services/auth-service';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -9,6 +10,7 @@ interface AuthState {
     name: string;
     avatar?: string;
     provider: 'google' | 'guest';
+    token?: string;
   } | null;
   error: string | null;
   loginWithGoogle: () => Promise<void>;
@@ -28,39 +30,33 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      // Development fallback - always use mock for now
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
+      const authService = AuthService.getInstance();
+      const success = await authService.signInWithGoogle();
       
-      const mockGoogleUser = {
-        id: 'google-user-dev-123',
-        email: 'dev@vetra.com',
-        name: 'Google User (Dev)',
-        picture: 'https://via.placeholder.com/40'
-      };
-      
-      set({
-        isAuthenticated: true,
-        isLoading: false,
-        user: {
-          id: mockGoogleUser.id,
-          email: mockGoogleUser.email,
-          name: mockGoogleUser.name,
-          avatar: mockGoogleUser.picture,
-          provider: 'google'
-        },
-        error: null
-      });
-      
-      // Store in localStorage instead of chrome.storage for now
-      localStorage.setItem('vetra-auth', JSON.stringify({
-        provider: 'google',
-        user: {
-          id: mockGoogleUser.id,
-          email: mockGoogleUser.email,
-          name: mockGoogleUser.name,
-          avatar: mockGoogleUser.picture
+      if (success) {
+        const authState = authService.getAuthState();
+        const user = authState.user;
+        
+        if (user) {
+          set({
+            isAuthenticated: true,
+            isLoading: false,
+            user: {
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              avatar: user.picture,
+              provider: 'google',
+              token: authState.token || undefined
+            },
+            error: null
+          });
+        } else {
+          throw new Error('No user data received from Google');
         }
-      }));
+      } else {
+        throw new Error('Google authentication failed');
+      }
       
     } catch (error: any) {
       console.error('Google login error:', error);
@@ -95,43 +91,52 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
   
   logout: async () => {
-    // Clear local storage
-    localStorage.removeItem('vetra-auth');
-    
-    set({
-      isAuthenticated: false,
-      user: null,
-      error: null
-    });
+    try {
+      const authService = AuthService.getInstance();
+      await authService.signOut();
+      
+      set({
+        isAuthenticated: false,
+        user: null,
+        error: null
+      });
+    } catch (error: any) {
+      console.error('Logout error:', error);
+      set({
+        isAuthenticated: false,
+        user: null,
+        error: error.message || 'Failed to logout'
+      });
+    }
   },
   
   checkAuthStatus: async () => {
     set({ isLoading: true });
     
     try {
-      // Check localStorage first
-      const authData = localStorage.getItem('vetra-auth');
+      const authService = AuthService.getInstance();
+      const authState = authService.getAuthState();
       
-      if (authData) {
-        const { provider, user } = JSON.parse(authData);
-        
+      if (authState.isAuthenticated && authState.user) {
         set({
           isAuthenticated: true,
           isLoading: false,
           user: {
-            ...user,
-            provider: provider
+            id: authState.user.id,
+            email: authState.user.email,
+            name: authState.user.name,
+            avatar: authState.user.picture,
+            provider: 'google',
+            token: authState.token || undefined
           }
         });
-        return;
+      } else {
+        set({
+          isAuthenticated: false,
+          isLoading: false,
+          user: null
+        });
       }
-      
-      // No valid auth found
-      set({
-        isAuthenticated: false,
-        isLoading: false,
-        user: null
-      });
       
     } catch (error) {
       set({

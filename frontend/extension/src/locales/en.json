@@ -22,6 +22,18 @@
     "history": "History",
     "settings": "Settings"
   },
+  "home": {
+    "status": "Status",
+    "protected": "Protected",
+    "connectedWallet": "Connected wallet",
+    "free": "Free",
+    "highRiskDetected": "High-risk transaction detected",
+    "viewAnalysis": "View analysis",
+    "block": "Block",
+    "recentActivity": "Recent Activity",
+    "history": "History",
+    "plans": "Plans"
+  },
   "risk": {
     "low": "Low Risk",
     "medium": "Medium Risk", 
@@ -52,10 +64,33 @@
   },
   "settings": {
     "title": "Settings",
-    "beginnerMode": "Beginner Mode",
-    "riskThreshold": "Risk Alert Threshold",
-    "autoBlock": "Auto-block high-risk transactions",
+    "account": "Account",
+    "free": "Free",
+    "signInWithGoogle": "Sign in with Google",
+    "preferences": "Preferences",
+    "theme": "Theme",
+    "themeDescription": "Choose between light or dark theme",
+    "dark": "Dark",
+    "light": "Light",
+    "soundAlerts": "Sound Alerts",
+    "soundAlertsDescription": "Play sound when detecting risky transactions",
     "language": "Language",
-    "privacy": "Privacy by Design - We don't collect your seed, wallet or personal data"
+    "languageDescription": "Interface Language",
+    "aiPersonalization": "AI Personalization",
+    "proFeature": "Pro Feature",
+    "aiRigidity": "AI Rigidity",
+    "moreConservative": "More Conservative",
+    "morePermissive": "More Permissive",
+    "aiLanguage": "AI Language",
+    "aiLanguageDescription": "AI Language",
+    "shareInsights": "Share insights (anonymous)",
+    "shareInsightsDescription": "Helps improve Vetra by sharing anonymized analysis data",
+    "transactionMemory": "Transaction Memory",
+    "transactionMemoryDescription": "Allows AI to learn from your previous transactions",
+    "smartContractFingerprints": "Smart Contract fingerprints",
+    "smartContractFingerprintsDescription": "Save contract signatures for quick verification",
+    "disconnectWallet": "Disconnect Wallet",
+    "logoutAccount": "Log out of account",
+    "privacy": "Your private keys remain secure. Vetra never solicits or stores your credentials."
   }
 }

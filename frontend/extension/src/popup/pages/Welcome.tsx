@@ -1,6 +1,7 @@
 import React from 'react';
-import { t, DEV_LANGUAGE } from '../../i18n';
+import { t } from '../../i18n';
 import { useAuthStore } from '../../store/auth-store';
+import { useLanguageStore } from '../../store/language-store';
 
 interface WelcomeProps {
   onGoogleLogin: () => void;
@@ -9,6 +10,7 @@ interface WelcomeProps {
 
 const Welcome: React.FC<WelcomeProps> = ({ onGoogleLogin, onContinueAsGuest }) => {
   const { isLoading, error, clearError } = useAuthStore();
+  const { language } = useLanguageStore();
 
   // Clear error when component mounts
   React.useEffect(() => {
@@ -33,12 +35,12 @@ const Welcome: React.FC<WelcomeProps> = ({ onGoogleLogin, onContinueAsGuest }) =
 
       {/* Título de Boas-vindas */}
       <h1 className="title-welcome mb-4" style={{ color: '#E6E6E6' }}>
-        {t('welcome.title', DEV_LANGUAGE)}
+        {t('welcome.title', language)}
       </h1>
 
       {/* Descrição */}
       <p className="subtitle-welcome mb-12" style={{ color: '#9CA3AF' }}>
-        {t('welcome.subtitle', DEV_LANGUAGE)}
+        {t('welcome.subtitle', language)}
       </p>
 
       {/* Botão Entrar com Google */}
@@ -62,7 +64,7 @@ const Welcome: React.FC<WelcomeProps> = ({ onGoogleLogin, onContinueAsGuest }) =
             Signing in...
           </div>
         ) : (
-          t('welcome.googleButton', DEV_LANGUAGE)
+          t('welcome.googleButton', language)
         )}
       </button>
 
@@ -81,7 +83,7 @@ const Welcome: React.FC<WelcomeProps> = ({ onGoogleLogin, onContinueAsGuest }) =
           fontWeight: '400'
         }}
       >
-        {t('welcome.guestButton', DEV_LANGUAGE)}
+        {t('welcome.guestButton', language)}
       </button>
 
       {/* Error Message */}
@@ -95,7 +97,7 @@ const Welcome: React.FC<WelcomeProps> = ({ onGoogleLogin, onContinueAsGuest }) =
 
       {/* Disclaimer */}
       <p className="description-welcome max-w-xs" style={{ color: '#9CA3AF' }}>
-        {t('welcome.disclaimer', DEV_LANGUAGE)}
+        {t('welcome.disclaimer', language)}
       </p>
     </div>
   );

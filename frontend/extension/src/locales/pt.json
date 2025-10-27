@@ -20,7 +20,19 @@
   "navigation": {
     "home": "Início",
     "history": "Histórico",
-    "settings": "Ajustes"
+    "settings": "Configurações"
+  },
+  "home": {
+    "status": "Status",
+    "protected": "Protegido",
+    "connectedWallet": "Carteira conectada",
+    "free": "Grátis",
+    "highRiskDetected": "Transação de alto risco detectada",
+    "viewAnalysis": "Ver análise",
+    "block": "Bloquear",
+    "recentActivity": "Atividade Recente",
+    "history": "Histórico",
+    "plans": "Planos"
   },
   "risk": {
     "low": "Risco Baixo",
@@ -51,11 +63,34 @@
     "thankYou": "Obrigado pelo feedback!"
   },
   "settings": {
-    "title": "Ajustes",
-    "beginnerMode": "Modo Iniciante",
-    "riskThreshold": "Limite de Alerta de Risco",
-    "autoBlock": "Bloquear automaticamente transações de alto risco",
+    "title": "Configurações",
+    "account": "Conta",
+    "free": "Grátis",
+    "signInWithGoogle": "Entrar com Google",
+    "preferences": "Preferências",
+    "theme": "Tema",
+    "themeDescription": "Escolha entre tema claro ou escuro",
+    "dark": "Escuro",
+    "light": "Claro",
+    "soundAlerts": "Alertas Sonoros",
+    "soundAlertsDescription": "Tocar som ao detectar transações de risco",
     "language": "Idioma",
-    "privacy": "Privacidade by Design - Não coletamos seed, wallet ou dados pessoais"
+    "languageDescription": "Idioma da Interface",
+    "aiPersonalization": "Personalização de IA",
+    "proFeature": "Recurso Pro",
+    "aiRigidity": "Rigidez da IA",
+    "moreConservative": "Mais Conservadora",
+    "morePermissive": "Mais Permissiva",
+    "aiLanguage": "Idioma da IA",
+    "aiLanguageDescription": "Idioma da IA",
+    "shareInsights": "Compartilhar insights (anônimo)",
+    "shareInsightsDescription": "Ajuda a melhorar o Vetra compartilhando dados de análise anonimizados",
+    "transactionMemory": "Memória de Transações",
+    "transactionMemoryDescription": "Permite que a IA aprenda com suas transações anteriores",
+    "smartContractFingerprints": "Assinaturas de Smart Contracts",
+    "smartContractFingerprintsDescription": "Salvar assinaturas de contratos para verificação rápida",
+    "disconnectWallet": "Desconectar Carteira",
+    "logoutAccount": "Sair da conta",
+    "privacy": "Suas chaves privadas permanecem seguras. Vetra nunca solicita ou armazena suas credenciais."
   }
 }
