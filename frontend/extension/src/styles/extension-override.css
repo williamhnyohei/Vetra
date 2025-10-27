@@ -1,0 +1,141 @@
+/* CSS definitivo para extensão - sempre funciona */
+html, body {
+    width: 420px !important;
+    height: 600px !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    position: relative !important;
+}
+
+#root {
+    width: 420px !important;
+    height: 600px !important;
+    overflow: hidden !important;
+    border-radius: 14px !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+    backdrop-filter: blur(10px) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    position: relative !important;
+}
+
+/* Remover qualquer scrollbar */
+::-webkit-scrollbar {
+    display: none !important;
+}
+
+/* Garantir que o conteúdo não vaze */
+* {
+    box-sizing: border-box !important;
+}
+
+/* Garantir que não há barras estranhas */
+body {
+    border-radius: 14px !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+/* Garantir que o conteúdo seja visível */
+.w-popup, .h-popup {
+    width: 420px !important;
+    height: 600px !important;
+}
+
+/* Garantir que o conteúdo não seja cortado */
+.overflow-hidden {
+    overflow: hidden !important;
+}
+
+/* Garantir que o flex funcione */
+.flex {
+    display: flex !important;
+}
+
+.flex-col {
+    flex-direction: column !important;
+}
+
+.items-center {
+    align-items: center !important;
+}
+
+.justify-center {
+    justify-content: center !important;
+}
+
+/* Remover bordas azuis do Chrome */
+* {
+    outline: none !important;
+    border: none !important;
+}
+
+*:focus {
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Remover bordas de foco */
+button:focus, input:focus, select:focus, textarea:focus {
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Forçar dimensões corretas */
+html {
+    max-width: 420px !important;
+    max-height: 600px !important;
+}
+
+body {
+    max-width: 420px !important;
+    max-height: 600px !important;
+}
+
+#root {
+    max-width: 420px !important;
+    max-height: 600px !important;
+}
+
+/* Garantir que não há overflow */
+* {
+    max-width: 420px !important;
+}
+
+/* Remover qualquer transformação que possa causar cortes */
+* {
+    transform: none !important;
+}
+
+/* Garantir que o conteúdo seja visível */
+.w-full {
+    width: 100% !important;
+}
+
+.h-full {
+    height: 100% !important;
+}
+
+/* Corrigir problemas específicos do React */
+.react-root {
+    width: 420px !important;
+    height: 600px !important;
+    overflow: hidden !important;
+}
+
+/* Garantir que não há elementos flutuantes */
+* {
+    float: none !important;
+    clear: both !important;
+}
+
+/* Garantir que o conteúdo não seja cortado */
+.container {
+    width: 420px !important;
+    height: 600px !important;
+    overflow: hidden !important;
+}

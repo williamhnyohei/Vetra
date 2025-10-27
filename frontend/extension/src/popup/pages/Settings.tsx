@@ -1,15 +1,122 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuthStore } from '../../store/auth-store';
+import { useLanguageStore } from '../../store/language-store';
+import { useThemeStore } from '../../store/theme-store';
+import { t } from '../../i18n';
+import SettingsService, { UserSettings } from '../../services/settings-service';
 
 interface SettingsProps {
   onBack?: () => void;
 }
 
 const Settings: React.FC<SettingsProps> = ({ onBack }) => {
+  const { user, logout, loginWithGoogle } = useAuthStore();
+  const { language, setLanguage } = useLanguageStore();
+  const { theme, setTheme } = useThemeStore();
   const [soundAlerts, setSoundAlerts] = useState(true);
   const [shareInsights, setShareInsights] = useState(true);
   const [transactionMemory, setTransactionMemory] = useState(false);
   const [smartContractFingerprints, setSmartContractFingerprints] = useState(false);
   const [aiRigidity, setAiRigidity] = useState(65);
+  const [aiLanguage, setAiLanguage] = useState<'en' | 'pt'>('pt');
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      console.log('✅ Logout successful, redirecting...');
+      // The App component will automatically redirect to Welcome page
+      // when isAuthenticated becomes false
+    } catch (error) {
+      console.error('❌ Logout error:', error);
+      alert('Failed to logout. Please try again.');
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    try {
+      await loginWithGoogle();
+    } catch (error) {
+      console.error('❌ Login error:', error);
+      alert('Failed to login with Google. Please try again.');
+    }
+  };
+
+  // Load settings from backend when component mounts (only once)
+  useEffect(() => {
+    const loadSettings = async () => {
+      // Only load from backend if user is logged in with Google (has token)
+      if (user?.provider === 'google' && user?.token) {
+        try {
+          const settingsService = SettingsService.getInstance();
+          const backendSettings = await settingsService.getSettings(user.token);
+          
+          // Update local state with backend settings
+          if (backendSettings.theme) {
+            setTheme(backendSettings.theme); // This will trigger theme application
+          }
+          if (backendSettings.language) setLanguage(backendSettings.language);
+          if (backendSettings.soundAlerts !== undefined) setSoundAlerts(backendSettings.soundAlerts);
+          if (backendSettings.shareInsights !== undefined) setShareInsights(backendSettings.shareInsights);
+          if (backendSettings.transactionMemory !== undefined) setTransactionMemory(backendSettings.transactionMemory);
+          if (backendSettings.smartContractFingerprints !== undefined) setSmartContractFingerprints(backendSettings.smartContractFingerprints);
+          if (backendSettings.aiRigidity !== undefined) setAiRigidity(backendSettings.aiRigidity);
+          if (backendSettings.aiLanguage) setAiLanguage(backendSettings.aiLanguage);
+          
+          console.log('✅ Settings loaded from backend');
+        } catch (error) {
+          console.error('❌ Error loading settings:', error);
+          // Continue with default settings if backend fails
+        }
+      }
+    };
+
+    loadSettings();
+  }, []); // Empty dependency array - only load once on mount
+
+  // Function to save settings to backend
+  const saveSettingToBackend = async (key: keyof UserSettings, value: any) => {
+    // Only save to backend if user is logged in with Google
+    if (user?.provider !== 'google' || !user?.token) {
+      console.log('⚠️ Guest user - settings not saved to backend');
+      return;
+    }
+
+    setIsSavingSettings(true);
+    try {
+      const settingsService = SettingsService.getInstance();
+      await settingsService.updateSetting(key, value, user.token);
+      console.log(`✅ Setting ${key} saved to backend:`, value);
+    } catch (error) {
+      console.error(`❌ Error saving ${key}:`, error);
+      // Don't show error to user, just log it
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
+  // Handler for theme change
+  const handleThemeChange = async (newTheme: 'light' | 'dark') => {
+    // Update theme store (this will persist and apply theme globally)
+    setTheme(newTheme);
+    
+    // Save to backend if logged in
+    await saveSettingToBackend('theme', newTheme);
+  };
+
+  // Handler for language change
+  const handleLanguageChange = async (newLanguage: 'en' | 'pt') => {
+    // Update global language store (this will trigger re-render of all components)
+    setLanguage(newLanguage);
+    console.log(`🌐 Language changed to: ${newLanguage}`);
+    
+    // Save to backend if logged in
+    await saveSettingToBackend('language', newLanguage);
+  };
 
   return (
     <div className="w-full h-full bg-dark-bg text-dark-text p-4 space-y-6 overflow-y-auto">
@@ -34,7 +141,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
               color: '#E6E6E6'
             }}
           >
-            Settings
+            {t('settings.title', language)}
           </h1>
         </div>
       </div>
@@ -52,7 +159,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
               color: '#E6E6E6'
             }}
           >
-            Account
+            {t('settings.account', language)}
           </h2>
           <div 
             className="px-3 py-1 rounded-full"
@@ -66,39 +173,70 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
               color: '#FFFFFF'
             }}
           >
-            Free
+            {t('settings.free', language)}
           </div>
         </div>
         
-        <div className="space-y-3">
-          <div>
-            <p 
-              style={{
-                fontFamily: 'Arial',
-                fontWeight: '400',
-                fontSize: '14px',
-                lineHeight: '20px',
-                letterSpacing: '0px',
-                color: '#E6E6E6'
-              }}
-            >
-              Fulaninho da Silva
-            </p>
-            <p 
-              style={{
-                fontFamily: 'Arial',
-                fontWeight: '400',
-                fontSize: '14px',
-                lineHeight: '20px',
-                letterSpacing: '0px',
-                color: '#858C94'
-              }}
-            >
-              silva.fulano@example.com
-            </p>
+        <div className="space-y-4">
+          {/* User Info */}
+          <div className="flex items-start gap-3">
+            {user?.avatar && (
+              <img 
+                src={user.avatar} 
+                alt={user.name}
+                className="w-12 h-12 rounded-full"
+              />
+            )}
+            <div className="flex-1">
+              <p 
+                style={{
+                  fontFamily: 'Arial',
+                  fontWeight: '400',
+                  fontSize: '14px',
+                  lineHeight: '20px',
+                  letterSpacing: '0px',
+                  color: '#E6E6E6'
+                }}
+              >
+                {user?.name || 'Guest User'}
+              </p>
+              {user?.provider !== 'guest' && (
+                <p 
+                  style={{
+                    fontFamily: 'Arial',
+                    fontWeight: '400',
+                    fontSize: '14px',
+                    lineHeight: '20px',
+                    letterSpacing: '0px',
+                    color: '#858C94'
+                  }}
+                >
+                  {user?.email || 'Not logged in'}
+                </p>
+              )}
+            </div>
           </div>
+
+          {/* Login with Google button (only for guests) */}
+          {user?.provider === 'guest' && (
+            <button
+              onClick={handleGoogleLogin}
+              className="w-full py-2.5 rounded-lg transition-colors"
+              style={{
+                backgroundColor: '#F5A524',
+                fontFamily: 'Arial',
+                fontWeight: '500',
+                fontSize: '14px',
+                lineHeight: '20px',
+                color: '#0B0B0B'
+              }}
+            >
+              {t('settings.signInWithGoogle', language)}
+            </button>
+          )}
           
-          <div>
+          {/* Connected Wallet - commented out for now, can be added later when wallet connection is implemented */}
+          {/* <div>
             <p 
               style={{
                 fontFamily: 'Arial',
@@ -121,9 +259,9 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                 color: '#858C94'
               }}
             >
-              0x742d35Cc6634C0532925a3b8D5c3Cf6...Ba3e
+              {truncateAddress('0x742d35Cc6634C0532925a3b8D5c3Cf6Ba3e')}
             </p>
-          </div>
+          </div> */}
         </div>
       </div>
 
@@ -142,7 +280,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
               marginBottom: '16px'
             }}
           >
-            Preferences
+            {t('settings.preferences', language)}
           </h3>
           
           <div className="space-y-4">
@@ -159,7 +297,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     color: '#E6E6E6'
                   }}
                 >
-                  Theme
+                  {t('settings.theme', language)}
                 </p>
                 <p 
                   style={{
@@ -171,10 +309,13 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     color: '#858C94'
                   }}
                 >
-                  Choose between light, dark, or automatic
+                  {t('settings.themeDescription', language)}
                 </p>
               </div>
               <select 
+                value={theme}
+                onChange={(e) => handleThemeChange(e.target.value as 'light' | 'dark')}
+                disabled={isSavingSettings}
                 className="bg-dark-bg border border-dark-border rounded px-3 py-2"
                 style={{
                   fontFamily: 'Arial',
@@ -182,10 +323,12 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                   fontSize: '14px',
                   lineHeight: '20px',
                   letterSpacing: '0px',
-                  color: '#E6E6E6'
+                  color: '#E6E6E6',
+                  opacity: isSavingSettings ? 0.5 : 1
                 }}
               >
-                <option>Automatic</option>
+                <option value="dark">{t('settings.dark', language)}</option>
+                <option value="light">{t('settings.light', language)}</option>
               </select>
             </div>
 
@@ -202,7 +345,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     color: '#E6E6E6'
                   }}
                 >
-                  Sound Alerts
+                  {t('settings.soundAlerts', language)}
                 </p>
                 <p 
                   style={{
@@ -214,7 +357,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     color: '#858C94'
                   }}
                 >
-                  Play sound when detecting risky transactions
+                  {t('settings.soundAlertsDescription', language)}
                 </p>
               </div>
               <button
@@ -244,7 +387,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     color: '#E6E6E6'
                   }}
                 >
-                  Language
+                  {t('settings.language', language)}
                 </p>
                 <p 
                   style={{
@@ -256,10 +399,13 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     color: '#858C94'
                   }}
                 >
-                  Interface Language
+                  {t('settings.languageDescription', language)}
                 </p>
               </div>
               <select 
+                value={language}
+                onChange={(e) => handleLanguageChange(e.target.value as 'en' | 'pt')}
+                disabled={isSavingSettings}
                 className="bg-dark-bg border border-dark-border rounded px-3 py-2"
                 style={{
                   fontFamily: 'Arial',
@@ -267,10 +413,12 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                   fontSize: '14px',
                   lineHeight: '20px',
                   letterSpacing: '0px',
-                  color: '#E6E6E6'
+                  color: '#E6E6E6',
+                  opacity: isSavingSettings ? 0.5 : 1
                 }}
               >
-                <option>Portuguese (Bl</option>
+                <option value="en">English</option>
+                <option value="pt">Portuguese (BR)</option>
               </select>
             </div>
           </div>
@@ -289,7 +437,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                 color: '#E6E6E6'
               }}
             >
-              AI Personalization
+              {t('settings.aiPersonalization', language)}
             </h3>
             <span 
               style={{
@@ -301,7 +449,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                 color: '#FBB500'
               }}
             >
-              Pro Feature
+              {t('settings.proFeature', language)}
             </span>
           </div>
           
@@ -319,7 +467,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     color: '#E6E6E6'
                   }}
                 >
-                  AI Rigidity
+                  {t('settings.aiRigidity', language)}
                 </p>
                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -338,7 +486,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                       color: '#858C94'
                     }}
                   >
-                    More Conservative
+                    {t('settings.moreConservative', language)}
                   </span>
                   <span 
                     style={{
@@ -377,7 +525,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                       color: '#858C94'
                     }}
                   >
-                    More Permissive
+                    {t('settings.morePermissive', language)}
                   </span>
                 </div>
               </div>
@@ -396,7 +544,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     color: '#E6E6E6'
                   }}
                 >
-                  AI Language
+                  {t('settings.aiLanguage', language)}
                 </p>
                 <p 
                   style={{
@@ -408,10 +556,17 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     color: '#858C94'
                   }}
                 >
-                  AI Language
+                  {t('settings.aiLanguageDescription', language)}
                 </p>
               </div>
               <select 
+                value={aiLanguage}
+                onChange={(e) => {
+                  const newLang = e.target.value as 'en' | 'pt';
+                  setAiLanguage(newLang);
+                  saveSettingToBackend('aiLanguage', newLang);
+                }}
+                disabled={isSavingSettings}
                 className="bg-dark-bg border border-dark-border rounded px-3 py-2"
                 style={{
                   fontFamily: 'Arial',
@@ -419,10 +574,12 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                   fontSize: '14px',
                   lineHeight: '20px',
                   letterSpacing: '0px',
-                  color: '#E6E6E6'
+                  color: '#E6E6E6',
+                  opacity: isSavingSettings ? 0.5 : 1
                 }}
               >
-                <option>Portuguese (Bl</option>
+                <option value="en">English</option>
+                <option value="pt">Portuguese (BR)</option>
               </select>
             </div>
           </div>
@@ -445,7 +602,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                   color: '#E6E6E6'
                 }}
               >
-                Share insights (anonymous)
+                {t('settings.shareInsights', language)}
               </p>
               <p 
                 style={{
@@ -457,7 +614,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                   color: '#858C94'
                 }}
               >
-                Helps improve Vetra by sharing anonymized analysis data
+                {t('settings.shareInsightsDescription', language)}
               </p>
             </div>
             <button
@@ -488,7 +645,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     color: '#E6E6E6'
                   }}
                 >
-                  Transaction Memory
+                  {t('settings.transactionMemory', language)}
                 </p>
                 <span 
                   style={{
@@ -500,7 +657,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     color: '#FBB500'
                   }}
                 >
-                  Pro Feature
+                  {t('settings.proFeature', language)}
                 </span>
               </div>
               <p 
@@ -513,7 +670,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                   color: '#858C94'
                 }}
               >
-                Allows AI to learn from your previous transactions
+                {t('settings.transactionMemoryDescription', language)}
               </p>
             </div>
             <button
@@ -543,7 +700,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                   color: '#E6E6E6'
                 }}
               >
-                Smart Contract fingerprints
+                {t('settings.smartContractFingerprints', language)}
               </p>
               <p 
                 style={{
@@ -555,7 +712,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                   color: '#858C94'
                 }}
               >
-                Save contract signatures for quick verification
+                {t('settings.smartContractFingerprintsDescription', language)}
               </p>
             </div>
             <button
@@ -594,28 +751,36 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
           </svg>
-          Disconnect Wallet
+          {t('settings.disconnectWallet', language)}
         </button>
-        <button 
-          className="flex-1 rounded-lg flex items-center justify-center gap-2 transition-colors"
-          style={{
-            backgroundColor: '#1E1E1E',
-            color: '#FFFFFF',
-            fontFamily: 'Arial',
-            fontWeight: '400',
-            fontSize: '14px',
-            lineHeight: '20px',
-            letterSpacing: '0px',
-            height: '3rem',
-            paddingLeft: '16px',
-            paddingRight: '16px'
-          }}
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          Log out of account
-        </button>
+        
+        {/* Show logout button only for logged in users (not guests) */}
+        {user?.provider !== 'guest' && (
+          <button 
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className="flex-1 rounded-lg flex items-center justify-center gap-2 transition-colors"
+            style={{
+              backgroundColor: '#1E1E1E',
+              color: '#FFFFFF',
+              fontFamily: 'Arial',
+              fontWeight: '400',
+              fontSize: '14px',
+              lineHeight: '20px',
+              letterSpacing: '0px',
+              height: '3rem',
+              paddingLeft: '16px',
+              paddingRight: '16px',
+              opacity: isLoggingOut ? 0.5 : 1,
+              cursor: isLoggingOut ? 'not-allowed' : 'pointer'
+            }}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {isLoggingOut ? (language === 'pt' ? 'Saindo...' : 'Logging out...') : t('settings.logoutAccount', language)}
+          </button>
+        )}
       </div>
 
       {/* Footer Disclaimer */}
@@ -633,7 +798,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
             color: '#858C94'
           }}
         >
-          Your private keys remain secure. Vetra never solicits or stores your credentials.
+          {t('settings.privacy', language)}
         </p>
       </div>
     </div>
