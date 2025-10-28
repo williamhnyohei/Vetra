@@ -62,15 +62,18 @@ async function connectRedis() {
     await redisClient.connect();
     return redisClient;
   } catch (error) {
-    console.error('❌ Redis connection failed:', error.message);
-    logger.error('❌ Redis connection failed:', error.message);
-    throw error;
+    console.warn('⚠️ Redis connection failed:', error.message);
+    console.warn('⚠️ Continuing without Redis (cache disabled)');
+    logger.warn('Redis connection failed, continuing without cache');
+    redisClient = null; // Set to null to indicate Redis is not available
+    return null;
   }
 }
 
-// Cache helper functions
+// Cache helper functions (gracefully handle when Redis is not available)
 const cache = {
   async get(key) {
+    if (!redisClient) return null;
     try {
       const value = await redisClient.get(key);
       return value ? JSON.parse(value) : null;
@@ -81,6 +84,7 @@ const cache = {
   },
 
   async set(key, value, ttl = 3600) {
+    if (!redisClient) return false;
     try {
       await redisClient.setEx(key, ttl, JSON.stringify(value));
       return true;
@@ -91,6 +95,7 @@ const cache = {
   },
 
   async del(key) {
+    if (!redisClient) return false;
     try {
       await redisClient.del(key);
       return true;
@@ -101,6 +106,7 @@ const cache = {
   },
 
   async exists(key) {
+    if (!redisClient) return false;
     try {
       const result = await redisClient.exists(key);
       return result === 1;
@@ -125,6 +131,7 @@ const cache = {
 
   // Rate limiting
   async incrementRateLimit(key, window = 900) { // 15 minutes
+    if (!redisClient) return 0;
     try {
       const current = await redisClient.incr(key);
       if (current === 1) {
