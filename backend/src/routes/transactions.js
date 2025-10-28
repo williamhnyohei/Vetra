@@ -8,12 +8,13 @@ const { body, query, validationResult } = require('express-validator');
 const { db } = require('../config/database');
 const { cache } = require('../config/redis');
 const { analyzeTransactionWithMultiAgent } = require('../services/multiAgentRiskAnalyzer');
+const { optionalAuth } = require('../middleware/auth');
 const logger = require('../utils/logger');
 
 const router = express.Router();
 
 // Analyze transaction
-router.post('/analyze', [
+router.post('/analyze', optionalAuth, [
   body('transactionData').isObject().notEmpty(),
   body('transactionData.signature').optional().isString(),
   body('transactionData.type').isString().notEmpty(),
@@ -33,7 +34,7 @@ router.post('/analyze', [
     }
 
     const { transactionData } = req.body;
-    const { userId } = req.user;
+    const userId = req.user ? req.user.userId : null;
 
     // Check cache first
     const cacheKey = `analysis:${transactionData.signature || transactionData.from + transactionData.to + transactionData.amount}`;
@@ -58,35 +59,40 @@ router.post('/analyze', [
     // Cache the analysis
     await cache.set(cacheKey, analysis, 3600); // 1 hour
 
-    // Store transaction in database
-    const [transaction] = await db('transactions')
-      .insert({
-        user_id: userId,
-        signature: transactionData.signature,
-        transaction_hash: transactionData.signature,
-        type: transactionData.type,
-        from_address: transactionData.from,
-        to_address: transactionData.to,
-        amount: transactionData.amount,
-        token_address: transactionData.token,
-        risk_score: analysis.score,
-        risk_level: analysis.level,
-        risk_reasons: analysis.reasons,
-        heuristics: analysis.heuristics,
-        status: 'pending',
-        analyzed_at: new Date(),
-      })
-      .returning('*');
+    let transaction = null;
+    
+    // Only store in database if user is authenticated
+    if (userId) {
+      [transaction] = await db('transactions')
+        .insert({
+          user_id: userId,
+          signature: transactionData.signature,
+          transaction_hash: transactionData.signature,
+          type: transactionData.type,
+          from_address: transactionData.from,
+          to_address: transactionData.to,
+          amount: transactionData.amount,
+          token_address: transactionData.token,
+          risk_score: analysis.score,
+          risk_level: analysis.level,
+          risk_reasons: analysis.reasons,
+          heuristics: analysis.heuristics,
+          status: 'pending',
+          analyzed_at: new Date(),
+        })
+        .returning('*');
+    }
 
     res.json({
       success: true,
       analysis,
-      transaction: {
+      transaction: transaction ? {
         id: transaction.id,
         risk_score: transaction.risk_score,
         risk_level: transaction.risk_level,
         status: transaction.status,
-      },
+      } : null,
+      authenticated: !!userId,
     });
 
   } catch (error) {

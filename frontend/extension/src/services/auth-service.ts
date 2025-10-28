@@ -23,9 +23,10 @@ class AuthService {
     user: null,
     token: null
   };
+  private initPromise: Promise<void>;
 
   private constructor() {
-    this.loadAuthState();
+    this.initPromise = this.loadAuthState();
   }
 
   public static getInstance(): AuthService {
@@ -36,6 +37,13 @@ class AuthService {
   }
 
   /**
+   * Wait for initialization to complete
+   */
+  public async waitForInitialization(): Promise<void> {
+    await this.initPromise;
+  }
+
+  /**
    * Load authentication state from storage
    */
   private async loadAuthState(): Promise<void> {
@@ -43,6 +51,9 @@ class AuthService {
       const result = await chrome.storage.local.get(['authState']);
       if (result.authState) {
         this.authState = result.authState;
+        console.log('✅ Auth state loaded from storage:', this.authState);
+      } else {
+        console.log('ℹ️ No auth state found in storage');
       }
     } catch (error) {
       console.error('Error loading auth state:', error);
@@ -154,6 +165,7 @@ class AuthService {
           await this.saveAuthState();
           
           console.log('✅ Google OAuth successful:', userInfo);
+          console.log('✅ Auth state saved to storage');
           return true;
         }
       }
@@ -170,7 +182,14 @@ class AuthService {
    * Build Google OAuth URL for launchWebAuthFlow
    */
   private buildAuthUrl(): string {
-    const clientId = '228752268593-0oc5m1qg37k27t7veo6f4jjtjgg7qtpc.apps.googleusercontent.com';
+    // Get client_id from manifest instead of hardcoding
+    const manifest = chrome.runtime.getManifest() as any;
+    const clientId = manifest.oauth2?.client_id;
+    
+    if (!clientId) {
+      throw new Error('OAuth2 client_id not found in manifest.json');
+    }
+    
     const redirectUri = chrome.identity.getRedirectURL();
     const scopes = ['openid', 'email', 'profile'];
     
@@ -183,6 +202,7 @@ class AuthService {
 
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
     console.log('🔐 Auth URL:', authUrl);
+    console.log('🔐 Client ID:', clientId);
     console.log('🔐 Redirect URI:', redirectUri);
     
     return authUrl;
