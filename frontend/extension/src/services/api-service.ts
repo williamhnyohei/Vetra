@@ -113,9 +113,12 @@ class ApiService {
       ...(options.headers || {}),
     };
 
-    // Add auth token if available
-    if (this.authToken) {
+    // Add auth token if available AND valid
+    if (this.authToken && this.authToken !== 'null' && this.authToken !== 'undefined') {
       headers['Authorization'] = `Bearer ${this.authToken}`;
+      console.log('🔑 Using auth token for request');
+    } else {
+      console.log('ℹ️ No auth token, making unauthenticated request');
     }
 
     const config: RequestInit = {

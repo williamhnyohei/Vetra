@@ -110,9 +110,31 @@ function parseTransferInstruction(instruction: any): {
  */
 export function parseTransaction(transaction: Transaction): ParsedTransaction {
   try {
-    const instructions = transaction.instructions;
-    const programs = instructions.map(ix => ix.programId.toBase58());
-    const accounts = instructions.flatMap(ix => ix.keys.map(k => k.pubkey.toBase58()));
+    const instructions = transaction.instructions || [];
+    
+    // Safely extract program IDs
+    const programs = instructions.map(ix => {
+      try {
+        return ix.programId?.toBase58 ? ix.programId.toBase58() : ix.programId?.toString() || 'Unknown';
+      } catch (e) {
+        return 'Unknown';
+      }
+    });
+    
+    // Safely extract accounts
+    const accounts = instructions.flatMap(ix => {
+      try {
+        return (ix.keys || []).map(k => {
+          try {
+            return k.pubkey?.toBase58 ? k.pubkey.toBase58() : k.pubkey?.toString() || 'Unknown';
+          } catch (e) {
+            return 'Unknown';
+          }
+        });
+      } catch (e) {
+        return [];
+      }
+    });
     
     // Remove duplicatas
     const uniquePrograms = [...new Set(programs)];
@@ -128,7 +150,9 @@ export function parseTransaction(transaction: Transaction): ParsedTransaction {
     // Analisa a primeira instrução para determinar o tipo
     if (instructions.length > 0) {
       const firstInstruction = instructions[0];
-      const programId = firstInstruction.programId.toBase58();
+      const programId = firstInstruction.programId?.toBase58 ? 
+        firstInstruction.programId.toBase58() : 
+        firstInstruction.programId?.toString() || 'Unknown';
       
       if (programId === SystemProgram.programId.toBase58()) {
         const instructionType = getSystemInstructionType(firstInstruction);
@@ -168,17 +192,20 @@ export function parseTransaction(transaction: Transaction): ParsedTransaction {
       tokenAddress,
       programs: uniquePrograms,
       accounts: uniqueAccounts,
-      instructions: instructions.map((ix, index) => ({
-        index,
-        programId: ix.programId.toBase58(),
-        program: KNOWN_PROGRAMS[ix.programId.toBase58()] || 'Unknown',
-        keys: ix.keys.map(k => ({
-          pubkey: k.pubkey.toBase58(),
-          isSigner: k.isSigner,
-          isWritable: k.isWritable,
-        })),
-        dataLength: ix.data?.length || 0,
-      })),
+      instructions: instructions.map((ix, index) => {
+        const programId = ix.programId?.toBase58 ? ix.programId.toBase58() : ix.programId?.toString() || 'Unknown';
+        return {
+          index,
+          programId,
+          program: KNOWN_PROGRAMS[programId] || 'Unknown',
+          keys: (ix.keys || []).map(k => ({
+            pubkey: k.pubkey?.toBase58 ? k.pubkey.toBase58() : k.pubkey?.toString() || 'Unknown',
+            isSigner: k.isSigner || false,
+            isWritable: k.isWritable || false,
+          })),
+          dataLength: ix.data?.length || 0,
+        };
+      }),
       metadata: {
         programIds: uniquePrograms,
         accountCount: uniqueAccounts.length,

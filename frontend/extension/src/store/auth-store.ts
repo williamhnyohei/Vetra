@@ -155,6 +155,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
       } else {
         console.log('❌ User is not authenticated');
+        
+        // Clear any invalid token from API service
+        const apiService = ApiService.getInstance();
+        apiService.setAuthToken('');
+        
         set({
           isAuthenticated: false,
           isLoading: false,
