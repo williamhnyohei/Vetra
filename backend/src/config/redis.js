@@ -8,64 +8,69 @@ const logger = require('../utils/logger');
 
 let redisClient;
 
-const redisConfig = process.env.REDIS_URL || {
-  host: process.env.REDIS_HOST || 'localhost',
-  port: process.env.REDIS_PORT || 6379,
-  password: process.env.REDIS_PASSWORD || undefined,
-  retry_strategy: (options) => {
-    if (options.error && options.error.code === 'ECONNREFUSED') {
-      logger.error('Redis server connection refused');
-      return new Error('Redis server connection refused');
-    }
-    if (options.total_retry_time > 1000 * 60 * 60) {
-      logger.error('Redis retry time exhausted');
-      return new Error('Retry time exhausted');
-    }
-    if (options.attempt > 10) {
-      logger.error('Redis max retry attempts reached');
-      return undefined;
-    }
-    return Math.min(options.attempt * 100, 3000);
-  },
-};
+// Configure Redis based on environment
+const redisConfig = process.env.REDIS_URL ? 
+  { url: process.env.REDIS_URL } : 
+  {
+    socket: {
+      host: process.env.REDIS_HOST || 'localhost',
+      port: parseInt(process.env.REDIS_PORT || '6379'),
+    },
+    password: process.env.REDIS_PASSWORD,
+  };
 
 async function connectRedis() {
+  // Skip if no Redis URL configured
+  if (!process.env.REDIS_URL) {
+    console.log('ℹ️ REDIS_URL not configured, skipping Redis (cache disabled)');
+    redisClient = null;
+    return null;
+  }
+
   try {
-    console.log('🔧 Redis Config:', {
-      hasRedisUrl: !!process.env.REDIS_URL,
-      redisUrl: process.env.REDIS_URL ? 'REDIS_URL is set' : 'REDIS_URL not set',
-      config: redisConfig
-    });
+    console.log('🔧 Connecting to Redis...');
     
     redisClient = redis.createClient(redisConfig);
     
+    // Suppress error logs - they're handled in catch
     redisClient.on('error', (err) => {
-      console.error('❌ Redis Client Error:', err.message);
-      logger.error('Redis Client Error:', err);
+      // Silently handle errors
     });
 
     redisClient.on('connect', () => {
-      console.log('✅ Redis client connected');
-      logger.info('✅ Redis client connected');
+      console.log('✅ Redis connected');
+      logger.info('Redis connected');
     });
 
     redisClient.on('ready', () => {
-      console.log('✅ Redis client ready');
-      logger.info('✅ Redis client ready');
+      console.log('✅ Redis ready');
+      logger.info('Redis ready');
     });
 
-    redisClient.on('end', () => {
-      console.log('Redis client disconnected');
-      logger.info('Redis client disconnected');
-    });
+    // Connect with timeout
+    const connectPromise = redisClient.connect();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Redis connection timeout')), 5000)
+    );
 
-    await redisClient.connect();
+    await Promise.race([connectPromise, timeoutPromise]);
+    
+    console.log('✅ Redis connection successful');
     return redisClient;
   } catch (error) {
-    console.warn('⚠️ Redis connection failed:', error.message);
-    console.warn('⚠️ Continuing without Redis (cache disabled)');
-    logger.warn('Redis connection failed, continuing without cache');
-    redisClient = null; // Set to null to indicate Redis is not available
+    console.warn('⚠️ Redis unavailable, continuing without cache');
+    logger.warn('Redis connection failed:', error.message);
+    
+    // Close client if it was created
+    if (redisClient) {
+      try {
+        await redisClient.quit();
+      } catch (e) {
+        // Ignore quit errors
+      }
+    }
+    
+    redisClient = null;
     return null;
   }
 }
