@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import ApiService from '../../services/api-service';
 
 interface HistoryProps {
   onBack?: () => void;
@@ -6,104 +7,35 @@ interface HistoryProps {
 }
 
 const History: React.FC<HistoryProps> = ({ onBack, onNavigateToPlans }) => {
-  const [currentPage, setCurrentPage] = useState(3);
+  const [currentPage, setCurrentPage] = useState(1);
   const [isFreePlan] = useState(true); // Simulate Free plan
+  const [allTransactions, setAllTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [totalPages, setTotalPages] = useState(1);
 
-  // Mock data for transactions
-  const allTransactions = [
-    {
-      id: '1',
-      address: '0xAb3...F9c2',
-      amount: '2.5 ETH',
-      network: 'Ethereum',
-      risk: 85,
-      date: '25/20/01 14:32',
-      status: 'blocked'
-    },
-    {
-      id: '2',
-      address: '0xAb3...F9c2',
-      amount: '2.5 ETH',
-      network: 'Ethereum',
-      risk: 85,
-      date: '25/20/01 14:32',
-      status: 'blocked'
-    },
-    {
-      id: '3',
-      address: '0x742...A8b1',
-      amount: '0.8 ETH',
-      network: 'Ethereum',
-      risk: 15,
-      date: '25/20/01 14:32',
-      status: 'approved'
-    },
-    {
-      id: '4',
-      address: '0x5F2...C3d4',
-      amount: '1.2 ETH',
-      network: 'Ethereum',
-      risk: 45,
-      date: '25/20/01 14:32',
-      status: 'warning'
-    },
-    {
-      id: '5',
-      address: '0x742...A8b1',
-      amount: '0.8 ETH',
-      network: 'Ethereum',
-      risk: 15,
-      date: '25/20/01 14:32',
-      status: 'approved'
-    },
-    {
-      id: '6',
-      address: '0x6A7...B5e9',
-      amount: '0.8 ETH',
-      network: 'Bitcoin',
-      risk: 30,
-      date: '25/20/01 15:00',
-      status: 'warning'
-    },
-    {
-      id: '7',
-      address: '0xAb3...F9c2',
-      amount: '2.5 ETH',
-      network: 'Ethereum',
-      risk: 85,
-      date: '25/20/01 14:32',
-      status: 'blocked'
-    },
-    {
-      id: '8',
-      address: '0x8F4...D1a2',
-      amount: '2.1 ETH',
-      network: 'Ripple',
-      risk: 50,
-      date: '25/20/01 15:30',
-      status: 'warning'
-    },
-    {
-      id: '9',
-      address: '0x9D2...F8c7',
-      amount: '3.0 ETH',
-      network: 'Litecoin',
-      risk: 20,
-      date: '25/20/01 16:00',
-      status: 'warning'
-    },
-    {
-      id: '10',
-      address: '0xA3B...E4f5',
-      amount: '1.5 ETH',
-      network: 'Cardano',
-      risk: 40,
-      date: '25/20/01 16:30',
-      status: 'warning'
-    }
-  ];
+  // Busca transações reais do backend
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      try {
+        const apiService = ApiService.getInstance();
+        const response = await apiService.getTransactionHistory({ 
+          page: currentPage, 
+          limit: 10 
+        });
+        setAllTransactions(response.transactions || []);
+        setTotalPages(response.pagination?.pages || 1);
+      } catch (error) {
+        console.error('Error fetching transactions:', error);
+        setAllTransactions([]);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Filter transactions based on plan
+    fetchTransactions();
+  }, [currentPage]);
+
+  // Filtra transações baseado no plano (Free = apenas 3)
   const transactions = isFreePlan ? allTransactions.slice(0, 3) : allTransactions;
 
   const getStatusIcon = (status: string) => {
@@ -264,7 +196,7 @@ const History: React.FC<HistoryProps> = ({ onBack, onNavigateToPlans }) => {
                     color: '#E6E6E6'
                   }}
                 >
-                  {transaction.address}
+                  {transaction.to_address ? `${transaction.to_address.substring(0, 5)}...${transaction.to_address.substring(transaction.to_address.length - 4)}` : 'Desconhecido'}
                 </span>
               </div>
               <div 
@@ -277,7 +209,7 @@ const History: React.FC<HistoryProps> = ({ onBack, onNavigateToPlans }) => {
                   color: '#E6E6E6'
                 }}
               >
-                {transaction.amount}
+                {transaction.amount ? `${(parseFloat(transaction.amount) / 1e9).toFixed(4)} SOL` : 'N/A'}
               </div>
               <div 
                 style={{
@@ -289,13 +221,13 @@ const History: React.FC<HistoryProps> = ({ onBack, onNavigateToPlans }) => {
                   color: '#E6E6E6'
                 }}
               >
-                {transaction.network}
+                {transaction.type || 'Solana'}
               </div>
               <div className="flex items-center justify-between">
                 <span 
                   className="px-2 py-1 rounded-full text-xs"
                   style={{
-                    backgroundColor: getRiskBackgroundColor(transaction.risk),
+                    backgroundColor: getRiskBackgroundColor(transaction.risk_score || 0),
                     color: '#FFFFFF',
                     fontFamily: 'Arial',
                     fontWeight: '400',
@@ -304,7 +236,7 @@ const History: React.FC<HistoryProps> = ({ onBack, onNavigateToPlans }) => {
                     letterSpacing: '0px'
                   }}
                 >
-                  {transaction.risk}%
+                  {transaction.risk_score || 0}%
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -318,7 +250,7 @@ const History: React.FC<HistoryProps> = ({ onBack, onNavigateToPlans }) => {
                     color: '#E6E6E6'
                   }}
                 >
-                  {transaction.date}
+                  {transaction.analyzed_at ? new Date(transaction.analyzed_at).toLocaleDateString('pt-BR') : 'N/A'}
                 </span>
                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

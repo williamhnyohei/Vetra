@@ -1,21 +1,22 @@
 // Injected Script - Runs in page context, has access to window.solana
-console.log('Vetra injected script loaded');
+console.log('🟣 Vetra injected script loaded');
+console.log('🔍 Checking for window.solana...');
 
-// Store original window.solana
-const originalSolana = (window as any).solana;
-
-if (originalSolana) {
-  console.log('Wrapping window.solana provider');
+// Function to wrap solana provider
+function wrapSolanaProvider(solanaProvider: any) {
+  console.log('✅ Wrapping window.solana provider...');
+  console.log('📦 Original Solana:', solanaProvider);
 
   // Create proxy to intercept method calls
-  const wrappedSolana = new Proxy(originalSolana, {
+  const wrappedSolana = new Proxy(solanaProvider, {
     get(target, prop) {
       const original = target[prop];
 
       // Intercept signTransaction and signAllTransactions
       if (prop === 'signTransaction' || prop === 'signAllTransactions') {
         return async function (...args: any[]) {
-          console.log(`Intercepting ${String(prop)}`, args);
+          console.log(`🎯 INTERCEPTED ${String(prop)}!!!`, args);
+          console.log('📦 Transaction object:', args[0]);
 
           // Generate request ID
           const requestId = Math.random().toString(36).substring(7);
@@ -72,7 +73,39 @@ if (originalSolana) {
     configurable: true,
   });
 
-  console.log('window.solana wrapped successfully');
+  console.log('✅ window.solana wrapped successfully!');
+  console.log('🔗 New window.solana:', wrappedSolana);
+  
+  return wrappedSolana;
+}
+
+// Store original window.solana
+const originalSolana = (window as any).solana;
+
+if (originalSolana) {
+  // Wrap existing solana provider
+  wrapSolanaProvider(originalSolana);
+} else {
+  console.warn('⚠️ window.solana not found yet. Setting up observer...');
+  
+  // Watch for window.solana to be added
+  let solanaCheckInterval: any;
+  let attempts = 0;
+  const maxAttempts = 50; // 5 seconds total (50 * 100ms)
+  
+  solanaCheckInterval = setInterval(() => {
+    attempts++;
+    
+    if ((window as any).solana) {
+      console.log('✅ window.solana detected! Wrapping now...');
+      clearInterval(solanaCheckInterval);
+      wrapSolanaProvider((window as any).solana);
+    } else if (attempts >= maxAttempts) {
+      console.warn('⚠️ window.solana not found after 5 seconds.');
+      console.log('💡 Tip: Make sure the page has a Solana wallet or provides window.solana');
+      clearInterval(solanaCheckInterval);
+    }
+  }, 100); // Check every 100ms
 }
 
 export {};

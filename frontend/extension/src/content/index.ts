@@ -1,16 +1,22 @@
 /// <reference types="chrome"/>
 
 // Content Script - Runs in the context of web pages
-console.log('Vetra content script loaded');
+console.log('🟢 Vetra content script loaded');
+console.log('📍 URL:', window.location.href);
 
 // Inject our script into the page context
 const script = document.createElement('script');
 script.src = chrome.runtime.getURL('injected.js');
 script.onload = function () {
+  console.log('✅ Injected script loaded successfully');
   // @ts-ignore
   this.remove();
 };
+script.onerror = function() {
+  console.error('❌ Failed to load injected script');
+};
 (document.head || document.documentElement).appendChild(script);
+console.log('📝 Injected script element added to page');
 
 // Listen for messages from injected script
 window.addEventListener('message', async (event) => {

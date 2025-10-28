@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import AuthService from '../services/auth-service';
+import ApiService from '../services/api-service';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -38,6 +39,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const user = authState.user;
         
         if (user) {
+          // Configura o token no ApiService
+          if (authState.token) {
+            const apiService = ApiService.getInstance();
+            apiService.setAuthToken(authState.token);
+            console.log('✅ Auth token set in API service');
+          }
+          
           set({
             isAuthenticated: true,
             isLoading: false,
@@ -115,9 +123,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     
     try {
       const authService = AuthService.getInstance();
+      
+      // Espera o AuthService carregar os dados do storage
+      await authService.waitForInitialization();
+      
       const authState = authService.getAuthState();
       
+      console.log('🔍 Checking auth status:', authState);
+      
       if (authState.isAuthenticated && authState.user) {
+        console.log('✅ User is authenticated');
+        
+        // Configura o token no ApiService
+        if (authState.token) {
+          const apiService = ApiService.getInstance();
+          apiService.setAuthToken(authState.token);
+          console.log('✅ Auth token restored in API service');
+        }
+        
         set({
           isAuthenticated: true,
           isLoading: false,
@@ -131,6 +154,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           }
         });
       } else {
+        console.log('❌ User is not authenticated');
         set({
           isAuthenticated: false,
           isLoading: false,
@@ -139,6 +163,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
       
     } catch (error) {
+      console.error('Error checking auth status:', error);
       set({
         isAuthenticated: false,
         isLoading: false,
