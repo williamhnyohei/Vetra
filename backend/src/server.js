@@ -76,7 +76,7 @@ app.use('/api/health', healthRoutes);
 
 // API routes
 app.use('/api/auth', authRoutes);
-app.use('/api/transactions', authenticateToken, transactionRoutes);
+app.use('/api/transactions', transactionRoutes); // Uses optionalAuth internally
 app.use('/api/attestations', authenticateToken, attestationRoutes);
 app.use('/api/users', authenticateToken, userRoutes);
 app.use('/api/settings', authenticateToken, settingsRoutes);
