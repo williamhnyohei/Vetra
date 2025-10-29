@@ -133,8 +133,7 @@ router.get('/history', [
 
     // Build query
     let query = db('transactions')
-      .where({ user_id: userId })
-      .orderBy('analyzed_at', 'desc');
+      .where({ user_id: userId });
 
     if (status) {
       query = query.where({ status });
@@ -144,11 +143,12 @@ router.get('/history', [
       query = query.where({ risk_level });
     }
 
-    // Get total count
+    // Get total count (without orderBy)
     const [{ count }] = await query.clone().count('* as count');
 
-    // Get transactions
+    // Get transactions (with orderBy)
     const transactions = await query
+      .orderBy('analyzed_at', 'desc')
       .limit(limit)
       .offset(offset)
       .select([
