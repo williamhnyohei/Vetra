@@ -22,3 +22,10 @@ matplotlib
 # Logs e Dev
 rich
 tqdm
+
+fastapi
+uvicorn
+python-dotenv
+langchain
+langchain-google-genai
+langgraph
