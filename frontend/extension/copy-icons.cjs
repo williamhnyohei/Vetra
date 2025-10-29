@@ -44,13 +44,11 @@ if (fs.existsSync(manifestPath)) {
     "128": "icons/icon-128.png"
   };
   
-  // OAuth2 commented out until configured
-  // if (!manifest.oauth2) {
-  //   manifest.oauth2 = {
-  //     "client_id": "YOUR_CLIENT_ID.apps.googleusercontent.com",
-  //     "scopes": ["openid", "email", "profile"]
-  //   };
-  // }
+  // Add OAuth2 configuration
+  manifest.oauth2 = {
+    "client_id": "228752268593-s74n1m4as4s2l49dbtu3squom8o7c0vi.apps.googleusercontent.com",
+    "scopes": ["openid", "email", "profile"]
+  };
   
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
   console.log('✅ Updated manifest.json');

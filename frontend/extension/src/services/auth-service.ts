@@ -154,19 +154,54 @@ class AuthService {
         // Get user info from Google
         const userInfo = await this.getUserInfoFromGoogle(token);
         if (userInfo) {
-          // Update auth state
-          this.authState = {
-            isAuthenticated: true,
-            user: userInfo,
-            token: token
-          };
-          
-          // Save to storage
-          await this.saveAuthState();
-          
-          console.log('✅ Google OAuth successful:', userInfo);
-          console.log('✅ Auth state saved to storage');
-          return true;
+          // Send token to backend to create user and get JWT
+          try {
+            console.log('🔐 Sending Google token to backend...');
+            
+            const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://vetra-production.up.railway.app/api';
+            const backendResponse = await fetch(`${API_BASE_URL}/auth/google/extension`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                token: token,
+                userInfo: userInfo,
+              }),
+            });
+
+            if (!backendResponse.ok) {
+              throw new Error(`Backend authentication failed: ${backendResponse.statusText}`);
+            }
+
+            const backendData = await backendResponse.json();
+            console.log('✅ Backend authentication successful:', backendData);
+
+            // Update auth state with backend JWT
+            this.authState = {
+              isAuthenticated: true,
+              user: backendData.user,
+              token: backendData.accessToken, // Use backend JWT instead of Google token
+            };
+            
+            // Save to storage
+            await this.saveAuthState();
+            
+            console.log('✅ Google OAuth successful and user created in database');
+            console.log('✅ Auth state saved to storage');
+            return true;
+          } catch (backendError) {
+            console.error('❌ Backend authentication failed:', backendError);
+            // Fallback: save Google token anyway
+            this.authState = {
+              isAuthenticated: true,
+              user: userInfo,
+              token: token
+            };
+            await this.saveAuthState();
+            console.warn('⚠️ Using Google token directly (backend unavailable)');
+            return true;
+          }
         }
       }
       
