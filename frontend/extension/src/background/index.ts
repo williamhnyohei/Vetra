@@ -177,7 +177,7 @@ async function handleTransactionAnalysis(payload: any) {
       try {
         const lamports = BigInt(parsedTx.amount);
         const sol = Number(lamports) / 1e9; // Convert lamports to SOL
-        displayAmount = sol.toFixed(4);
+        displayAmount = sol.toFixed(6); // Show up to 6 decimal places
       } catch (error) {
         console.error('Error converting amount:', error);
         displayAmount = parsedTx.amount;
@@ -224,6 +224,15 @@ async function handleTransactionAnalysis(payload: any) {
     });
     
     console.log('💾 Transaction stored in chrome.storage for popup display');
+    
+    // Open popup automatically when transaction is intercepted
+    try {
+      await chrome.action.openPopup();
+      console.log('✅ Popup opened automatically');
+    } catch (error) {
+      console.warn('⚠️ Could not open popup automatically:', error);
+      // Fallback: user will need to click the extension icon
+    }
     
     // Handle high risk transactions
     if (isHighRisk) {
