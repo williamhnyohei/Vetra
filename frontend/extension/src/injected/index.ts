@@ -1,7 +1,22 @@
 // Injected Script - Runs in page context, has access to window.solana
 console.log('🟣 Vetra injected script loaded');
 console.log('🔍 Checking for window.solana...');
-console.log('🌐 Network: Solana Mainnet');
+
+// Detect network (will be determined from wallet connection)
+let currentNetwork = 'unknown';
+
+// Try to detect network from URL or other indicators
+if (window.location.hostname.includes('devnet') || window.location.search.includes('devnet')) {
+  currentNetwork = 'devnet';
+  console.log('🌐 Network: Solana Devnet (Testing Environment)');
+  console.log('💡 Using fake SOL - test safely!');
+} else if (window.location.hostname.includes('testnet') || window.location.search.includes('testnet')) {
+  currentNetwork = 'testnet';
+  console.log('🌐 Network: Solana Testnet');
+} else {
+  currentNetwork = 'mainnet';
+  console.log('🌐 Network: Solana Mainnet');
+}
 
 // Serialize transaction to safely pass through messages
 function serializeTransaction(transaction: any): any {
@@ -89,6 +104,7 @@ function wrapSolanaProvider(solanaProvider: any) {
                 transaction: serializedTx,
                 url: window.location.href,
                 timestamp: Date.now(),
+                network: currentNetwork,
               },
             },
             '*'

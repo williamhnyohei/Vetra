@@ -7,8 +7,8 @@ import AuthService from '../services/auth-service';
 
 // Background Service Worker for MV3
 console.log('🛡️ Vetra background service worker initialized');
-console.log('🌐 Network: Solana Mainnet');
 console.log('🔒 Transaction interception: ACTIVE');
+console.log('🌐 Supports: Mainnet, Devnet, Testnet');
 
 // Initialize services
 const apiService = ApiService.getInstance();
@@ -95,10 +95,19 @@ function waitForUserApproval(timeoutMs: number): Promise<{ approved: boolean }> 
  */
 async function handleTransactionAnalysis(payload: any) {
   try {
-    console.log('🔍 Analyzing transaction on Solana Mainnet');
+    const network = payload.network || 'mainnet';
+    const networkEmoji = network === 'devnet' ? '🧪' : network === 'testnet' ? '🔧' : '🌐';
+    const networkName = network === 'devnet' ? 'Devnet (Testing)' : network === 'testnet' ? 'Testnet' : 'Mainnet';
+    
+    console.log(`🔍 Analyzing transaction on Solana ${networkName}`);
+    console.log(`${networkEmoji} Network:`, network.toUpperCase());
     console.log('🌐 Origin URL:', payload.url);
     console.log('🔧 Method:', payload.method);
     console.log('⏰ Timestamp:', new Date(payload.timestamp).toISOString());
+    
+    if (network === 'devnet') {
+      console.log('💡 Devnet detected - using test SOL (no real money)');
+    }
     
     // Parse the transaction from the payload
     const transaction = reconstructTransaction(payload.transaction);
