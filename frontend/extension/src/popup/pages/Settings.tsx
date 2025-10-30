@@ -364,7 +364,11 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                 className={`w-12 h-6 rounded-full transition-colors ${
                   soundAlerts ? 'bg-yellow-500' : 'bg-gray-600'
                 }`}
-                onClick={() => setSoundAlerts(!soundAlerts)}
+                onClick={() => {
+                  const newValue = !soundAlerts;
+                  setSoundAlerts(newValue);
+                  saveSettingToBackend('soundAlerts', newValue);
+                }}
               >
                 <div
                   className={`w-5 h-5 bg-white rounded-full transition-transform ${
@@ -507,7 +511,17 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                   min="0"
                   max="100"
                   value={aiRigidity}
-                  onChange={(e) => setAiRigidity(Number(e.target.value))}
+                  onChange={(e) => {
+                    const newValue = Number(e.target.value);
+                    setAiRigidity(newValue);
+                  }}
+                  onMouseUp={async () => {
+                    await saveSettingToBackend('aiRigidity', aiRigidity);
+                  }}
+                  onTouchEnd={async () => {
+                    await saveSettingToBackend('aiRigidity', aiRigidity);
+                  }}
+                  disabled={isSavingSettings}
                   className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
                   style={{
                     background: `linear-gradient(to right, #FBB500 0%, #FBB500 ${aiRigidity}%, #374151 ${aiRigidity}%, #374151 100%)`
@@ -621,7 +635,11 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
               className={`w-12 h-6 rounded-full transition-colors ${
                 shareInsights ? 'bg-yellow-500' : 'bg-gray-600'
               }`}
-              onClick={() => setShareInsights(!shareInsights)}
+              onClick={() => {
+                const newValue = !shareInsights;
+                setShareInsights(newValue);
+                saveSettingToBackend('shareInsights', newValue);
+              }}
             >
               <div
                 className={`w-5 h-5 bg-white rounded-full transition-transform ${
@@ -677,7 +695,11 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
               className={`w-12 h-6 rounded-full transition-colors ${
                 transactionMemory ? 'bg-yellow-500' : 'bg-gray-600'
               }`}
-              onClick={() => setTransactionMemory(!transactionMemory)}
+              onClick={() => {
+                const newValue = !transactionMemory;
+                setTransactionMemory(newValue);
+                saveSettingToBackend('transactionMemory', newValue);
+              }}
             >
               <div
                 className={`w-5 h-5 bg-white rounded-full transition-transform ${
@@ -719,7 +741,11 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
               className={`w-12 h-6 rounded-full transition-colors ${
                 smartContractFingerprints ? 'bg-yellow-500' : 'bg-gray-600'
               }`}
-              onClick={() => setSmartContractFingerprints(!smartContractFingerprints)}
+              onClick={() => {
+                const newValue = !smartContractFingerprints;
+                setSmartContractFingerprints(newValue);
+                saveSettingToBackend('smartContractFingerprints', newValue);
+              }}
             >
               <div
                 className={`w-5 h-5 bg-white rounded-full transition-transform ${

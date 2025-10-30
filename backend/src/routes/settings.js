@@ -31,6 +31,7 @@ router.get('/', async (req, res) => {
     const defaultSettings = {
       theme: 'dark',
       language: 'en',
+      soundAlerts: true,
       notifications: {
         email: true,
         push: true,
@@ -42,10 +43,15 @@ router.get('/', async (req, res) => {
       show_attestations: true,
       rpc_endpoint: 'https://api.mainnet-beta.solana.com',
       network: 'mainnet-beta',
+      aiRigidity: 50,
       ai_rigidity: 50,
+      aiLanguage: 'en',
       ai_language: 'en',
+      shareInsights: false,
       share_insights: false,
+      transactionMemory: true,
       transaction_memory: true,
+      smartContractFingerprints: true,
       smart_contract_fingerprints: true,
     };
 
@@ -70,16 +76,22 @@ router.get('/', async (req, res) => {
 router.patch('/', [
   body('theme').optional().isIn(['light', 'dark', 'auto']),
   body('language').optional().isIn(['en', 'pt', 'es']),
+  body('soundAlerts').optional().isBoolean(),
   body('notifications').optional().isObject(),
   body('risk_threshold').optional().isInt({ min: 0, max: 100 }),
   body('auto_block_high_risk').optional().isBoolean(),
   body('show_attestations').optional().isBoolean(),
   body('rpc_endpoint').optional().isURL(),
   body('network').optional().isIn(['mainnet-beta', 'devnet', 'testnet']),
+  body('aiRigidity').optional().isInt({ min: 0, max: 100 }),
   body('ai_rigidity').optional().isInt({ min: 0, max: 100 }),
+  body('aiLanguage').optional().isIn(['en', 'pt', 'es']),
   body('ai_language').optional().isIn(['en', 'pt', 'es']),
+  body('shareInsights').optional().isBoolean(),
   body('share_insights').optional().isBoolean(),
+  body('transactionMemory').optional().isBoolean(),
   body('transaction_memory').optional().isBoolean(),
+  body('smartContractFingerprints').optional().isBoolean(),
   body('smart_contract_fingerprints').optional().isBoolean(),
 ], async (req, res) => {
   try {

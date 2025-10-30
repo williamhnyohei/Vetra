@@ -10,6 +10,7 @@ const { body, validationResult } = require('express-validator');
 const { db } = require('../config/database');
 const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
+const { DEFAULT_SETTINGS } = require('../config/defaults');
 
 const router = express.Router();
 
@@ -39,6 +40,7 @@ router.get('/google/callback',
             provider: 'google',
             provider_id: user.id,
             is_verified: true,
+            settings: DEFAULT_SETTINGS,
             last_login_at: new Date(),
           })
           .returning('*');
@@ -89,6 +91,148 @@ router.get('/google/callback',
   }
 );
 
+// Google Extension login - validates Google token and creates user
+router.post('/google/extension', [
+  body('token').isString().notEmpty(),
+  body('userInfo').isObject().optional(),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: errors.array(),
+      });
+    }
+
+    const { token, userInfo, guestUserId } = req.body;
+
+    // Validate token with Google
+    let googleUser;
+    try {
+      const googleResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (!googleResponse.ok) {
+        throw new Error('Invalid Google token');
+      }
+
+      googleUser = await googleResponse.json();
+    } catch (error) {
+      logger.error('Google token validation error:', error);
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid Google token',
+      });
+    }
+
+    // Check if user exists
+    let dbUser = await db('users')
+      .where({ email: googleUser.email })
+      .first();
+
+    if (!dbUser) {
+      // Create new user
+      [dbUser] = await db('users')
+        .insert({
+          email: googleUser.email,
+          name: googleUser.name,
+          avatar_url: googleUser.picture,
+          provider: 'google',
+          provider_id: googleUser.id,
+          is_verified: true,
+          is_active: true,
+          settings: DEFAULT_SETTINGS,
+          last_login_at: new Date(),
+        })
+        .returning('*');
+      
+      logger.info('New user created via Google extension', {
+        userId: dbUser.id,
+        email: dbUser.email,
+      });
+    } else {
+      // Update last login
+      await db('users')
+        .where({ id: dbUser.id })
+        .update({ 
+          last_login_at: new Date(),
+          avatar_url: googleUser.picture, // Update avatar in case it changed
+        });
+      
+      logger.info('User logged in via Google extension', {
+        userId: dbUser.id,
+        email: dbUser.email,
+      });
+    }
+
+    // Migrate transactions from guest user if provided
+    if (guestUserId) {
+      try {
+        // Migrate all transactions from guest to Google user
+        const migratedCount = await db('transactions')
+          .where({ user_id: guestUserId })
+          .update({ user_id: dbUser.id });
+        
+        logger.info('✅ Migrated transactions from guest to Google user', {
+          guestUserId,
+          googleUserId: dbUser.id,
+          transactionCount: migratedCount,
+        });
+        
+        // Delete guest user
+        await db('users').where({ id: guestUserId }).delete();
+        
+        logger.info('✅ Guest user deleted after migration', { guestUserId });
+      } catch (migrationError) {
+        logger.error('❌ Error migrating guest transactions:', migrationError);
+        // Continue anyway - don't fail the login
+      }
+    }
+
+    // Generate JWT tokens
+    const accessToken = jwt.sign(
+      { userId: dbUser.id, email: dbUser.email },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+
+    const refreshToken = jwt.sign(
+      { userId: dbUser.id },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d' }
+    );
+
+    // Store refresh token in cache
+    await cache.set(`refresh:${dbUser.id}`, refreshToken, 30 * 24 * 60 * 60); // 30 days
+
+    res.json({
+      success: true,
+      user: {
+        id: dbUser.id,
+        email: dbUser.email,
+        name: dbUser.name,
+        avatar: dbUser.avatar_url,
+        provider: dbUser.provider,
+        subscription_plan: dbUser.subscription_plan,
+      },
+      accessToken,
+      refreshToken,
+    });
+
+  } catch (error) {
+    logger.error('Google extension login error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Authentication failed',
+    });
+  }
+});
+
 // Guest login
 router.post('/guest', [
   body('name').optional().isString().trim().isLength({ min: 1, max: 100 }),
@@ -113,6 +257,7 @@ router.post('/guest', [
         name,
         provider: 'guest',
         is_active: true,
+        settings: DEFAULT_SETTINGS,
         last_login_at: new Date(),
       })
       .returning('*');
@@ -264,7 +409,6 @@ router.get('/me', async (req, res) => {
         avatar: user.avatar_url,
         provider: user.provider,
         subscription_plan: user.subscription_plan,
-        preferences: user.preferences,
         settings: user.settings,
         created_at: user.created_at,
         last_login_at: user.last_login_at,

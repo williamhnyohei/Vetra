@@ -129,7 +129,6 @@ router.get('/settings', async (req, res) => {
     res.json({
       success: true,
       settings: user.settings || {},
-      preferences: user.preferences || {},
     });
 
   } catch (error) {
@@ -144,7 +143,6 @@ router.get('/settings', async (req, res) => {
 // Update user settings
 router.patch('/settings', [
   body('settings').optional().isObject(),
-  body('preferences').optional().isObject(),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -157,11 +155,10 @@ router.patch('/settings', [
     }
 
     const { userId } = req.user;
-    const { settings, preferences } = req.body;
+    const { settings } = req.body;
 
     const updateData = {};
     if (settings) updateData.settings = settings;
-    if (preferences) updateData.preferences = preferences;
 
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({
@@ -180,7 +177,6 @@ router.patch('/settings', [
     res.json({
       success: true,
       settings: updatedUser.settings,
-      preferences: updatedUser.preferences,
     });
 
   } catch (error) {
@@ -291,6 +287,53 @@ router.delete('/account', [
     res.status(500).json({
       success: false,
       error: 'Failed to delete account',
+    });
+  }
+});
+
+// Upgrade to Pro plan
+router.post('/upgrade-to-pro', async (req, res) => {
+  try {
+    const { userId } = req.user;
+
+    // Update user subscription to Pro
+    const [updatedUser] = await db('users')
+      .where({ id: userId })
+      .update({
+        subscription_plan: 'pro',
+        subscription_expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
+        updated_at: new Date(),
+      })
+      .returning('*');
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
+
+    logger.info('User upgraded to Pro', {
+      userId: updatedUser.id,
+      email: updatedUser.email,
+    });
+
+    res.json({
+      success: true,
+      message: 'Successfully upgraded to Pro',
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        subscription_plan: updatedUser.subscription_plan,
+        subscription_expires_at: updatedUser.subscription_expires_at,
+      },
+    });
+
+  } catch (error) {
+    logger.error('Upgrade to Pro error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to upgrade to Pro',
     });
   }
 });

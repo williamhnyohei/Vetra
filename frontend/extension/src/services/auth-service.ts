@@ -154,19 +154,67 @@ class AuthService {
         // Get user info from Google
         const userInfo = await this.getUserInfoFromGoogle(token);
         if (userInfo) {
-          // Update auth state
-          this.authState = {
-            isAuthenticated: true,
-            user: userInfo,
-            token: token
-          };
-          
-          // Save to storage
-          await this.saveAuthState();
-          
-          console.log('✅ Google OAuth successful:', userInfo);
-          console.log('✅ Auth state saved to storage');
-          return true;
+          // Send token to backend to create user and get JWT
+          try {
+            console.log('🔐 Sending Google token to backend...');
+            
+            // Check if there was a previous guest user
+            let guestUserId = null;
+            try {
+              const storage = await chrome.storage.local.get(['authState']);
+              if (storage.authState?.user?.email?.includes('guest_')) {
+                guestUserId = storage.authState.user.id;
+                console.log('📦 Found previous guest user:', guestUserId);
+              }
+            } catch (e) {
+              console.warn('Could not check for previous guest user:', e);
+            }
+            
+            const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://vetra-production.up.railway.app/api';
+            const backendResponse = await fetch(`${API_BASE_URL}/auth/google/extension`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                token: token,
+                userInfo: userInfo,
+                guestUserId: guestUserId, // Send guest ID for migration
+              }),
+            });
+
+            if (!backendResponse.ok) {
+              throw new Error(`Backend authentication failed: ${backendResponse.statusText}`);
+            }
+
+            const backendData = await backendResponse.json();
+            console.log('✅ Backend authentication successful:', backendData);
+
+            // Update auth state with backend JWT
+            this.authState = {
+              isAuthenticated: true,
+              user: backendData.user,
+              token: backendData.accessToken, // Use backend JWT instead of Google token
+            };
+            
+            // Save to storage
+            await this.saveAuthState();
+            
+            console.log('✅ Google OAuth successful and user created in database');
+            console.log('✅ Auth state saved to storage');
+            return true;
+          } catch (backendError) {
+            console.error('❌ Backend authentication failed:', backendError);
+            // Fallback: save Google token anyway
+            this.authState = {
+              isAuthenticated: true,
+              user: userInfo,
+              token: token
+            };
+            await this.saveAuthState();
+            console.warn('⚠️ Using Google token directly (backend unavailable)');
+            return true;
+          }
         }
       }
       
@@ -240,14 +288,83 @@ class AuthService {
   }
 
   /**
+   * Sign in as Guest
+   * Creates a temporary guest user in the backend
+   */
+  public async signInAsGuest(): Promise<boolean> {
+    try {
+      console.log('👤 Signing in as Guest...');
+      
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://vetra-production.up.railway.app/api';
+      
+      // Call backend to create guest user
+      const response = await fetch(`${API_BASE_URL}/auth/guest`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: 'Guest User',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to create guest user: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Guest user created:', data);
+
+      // Update auth state
+      this.authState = {
+        isAuthenticated: true,
+        user: {
+          id: data.user.id,
+          email: data.user.email,
+          name: data.user.name,
+          picture: undefined,
+        },
+        token: data.accessToken,
+      };
+
+      // Save to storage
+      await this.saveAuthState();
+
+      console.log('✅ Signed in as Guest successfully');
+      return true;
+    } catch (error) {
+      console.error('❌ Guest sign in error:', error);
+      return false;
+    }
+  }
+
+  /**
    * Sign out
    */
   public async signOut(): Promise<void> {
     try {
       console.log('🔓 Starting logout...');
       
-      // Revoke Chrome's cached auth token
-      if (this.authState.token) {
+      const currentProvider = this.authState.user?.email?.includes('guest_') ? 'guest' : 'google';
+      
+      // If guest user, delete from backend
+      if (currentProvider === 'guest' && this.authState.token) {
+        try {
+          const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://vetra-production.up.railway.app/api';
+          await fetch(`${API_BASE_URL}/users/me`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${this.authState.token}`,
+            },
+          });
+          console.log('✅ Guest user deleted from backend');
+        } catch (error) {
+          console.warn('⚠️ Could not delete guest user:', error);
+        }
+      }
+      
+      // Revoke Chrome's cached auth token (for Google accounts)
+      if (currentProvider === 'google' && this.authState.token) {
         await new Promise<void>((resolve) => {
           chrome.identity.removeCachedAuthToken({ token: this.authState.token! }, () => {
             console.log('✅ Token removed from cache');
