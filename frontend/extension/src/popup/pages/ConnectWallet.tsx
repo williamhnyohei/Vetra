@@ -4,6 +4,8 @@ interface ConnectWalletProps {
   onBack?: () => void;
 }
 
+type ProviderName = 'phantom' | 'backpack' | 'solflare' | 'auto';
+
 type ConnectResult = {
   success: boolean;
   publicKey?: string;
@@ -12,20 +14,24 @@ type ConnectResult = {
 
 async function sendToActiveTab<T = any>(msg: any): Promise<T> {
   return new Promise((resolve, reject) => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tabId = tabs?.[0]?.id;
-      if (!tabId) return reject(new Error('No active tab'));
-      chrome.tabs.sendMessage(tabId, msg, (res) => {
-        const lastErr = chrome.runtime.lastError;
-        if (lastErr) return reject(new Error(lastErr.message));
-        if (!res) return reject(new Error('No response from content script'));
-        resolve(res);
+    try {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        const tabId = tabs?.[0]?.id;
+        if (!tabId) return reject(new Error('No active tab'));
+        chrome.tabs.sendMessage(tabId, msg, (res) => {
+          const lastErr = chrome.runtime.lastError;
+          if (lastErr) return reject(new Error(lastErr.message));
+          if (!res) return reject(new Error('No response from content script'));
+          resolve(res);
+        });
       });
-    });
+    } catch (e: any) {
+      reject(new Error(String(e?.message || e)));
+    }
   });
 }
 
-async function requestWalletConnect(provider: 'phantom' | 'backpack' | 'auto'): Promise<ConnectResult> {
+async function requestWalletConnect(provider: ProviderName): Promise<ConnectResult> {
   try {
     const res = await sendToActiveTab<ConnectResult>({
       type: 'VETRA_CONNECT_WALLET',
@@ -41,11 +47,14 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onBack }) => {
   const [pubkey, setPubkey] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<boolean>(false);
+  const [lastProvider, setLastProvider] = useState<ProviderName | null>(null);
 
-  const handleConnect = async (provider: 'phantom' | 'backpack' | 'auto') => {
+  const handleConnect = async (provider: ProviderName) => {
     setBusy(true);
     setErr(null);
     setPubkey(null);
+    setLastProvider(provider);
+
     const res = await requestWalletConnect(provider);
     setBusy(false);
 
@@ -55,6 +64,15 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onBack }) => {
     }
     setPubkey(res.publicKey || null);
   };
+
+  const connectedLabel =
+    lastProvider === 'phantom'
+      ? 'Phantom'
+      : lastProvider === 'backpack'
+      ? 'Backpack'
+      : lastProvider === 'solflare'
+      ? 'Solflare'
+      : 'Wallet';
 
   return (
     <div className="w-full h-full bg-dark-bg text-dark-text p-4 space-y-6 overflow-y-auto">
@@ -66,7 +84,15 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onBack }) => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <h1 style={{ fontFamily: 'Arial', fontWeight: 700, fontSize: 18, lineHeight: '24px', color: '#E6E6E6' }}>
+          <h1
+            style={{
+              fontFamily: 'Arial',
+              fontWeight: 700,
+              fontSize: 18,
+              lineHeight: '24px',
+              color: '#E6E6E6',
+            }}
+          >
             Connect Wallet
           </h1>
         </div>
@@ -80,16 +106,30 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onBack }) => {
             <path d="M15 10a1 1 0 0 0-1 1v2a1 1 0 0 0 2 0v-2a1 1 0 0 0-1-1z" />
           </svg>
         </div>
-        <p style={{ fontFamily: 'Arial', fontSize: 14, lineHeight: '20px', color: '#E6E6E6' }}>
+        <p
+          style={{
+            fontFamily: 'Arial',
+            fontSize: 14,
+            lineHeight: '20px',
+            color: '#E6E6E6',
+          }}
+        >
           Choose your wallet to start protecting your transactions.
         </p>
 
         {pubkey && (
           <p className="mt-2 text-xs text-green-400">
-            Connected: <span className="font-mono">{pubkey.slice(0, 6)}…{pubkey.slice(-6)}</span>
+            Connected ({connectedLabel}):{' '}
+            <span className="font-mono">
+              {pubkey.slice(0, 6)}…{pubkey.slice(-6)}
+            </span>
           </p>
         )}
-        {err && <p className="mt-2 text-xs text-red-400">{err}</p>}
+        {err && (
+          <p className="mt-2 text-xs text-red-400">
+            {err}
+          </p>
+        )}
       </div>
 
       {/* Wallet options */}
@@ -98,12 +138,16 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onBack }) => {
         <button
           onClick={() => handleConnect('phantom')}
           disabled={busy}
-          className={`w-full rounded-lg p-4 flex items-center justify-between transition-colors ${busy ? 'opacity-60 cursor-not-allowed' : 'hover:opacity-90'}`}
+          className={`w-full rounded-lg p-4 flex items-center justify-between transition-colors ${
+            busy ? 'opacity-60 cursor-not-allowed' : 'hover:opacity-90'
+          }`}
           style={{ backgroundColor: '#7C3AED' }}
         >
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
-              <span style={{ fontFamily: 'Arial', fontWeight: 700, fontSize: 16, color: '#7C3AED' }}>P</span>
+              <span style={{ fontFamily: 'Arial', fontWeight: 700, fontSize: 16, color: '#7C3AED' }}>
+                P
+              </span>
             </div>
             <div className="text-left">
               <p style={{ fontFamily: 'Arial', fontSize: 14, color: '#FFFFFF' }}>Phantom</p>
@@ -119,15 +163,44 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onBack }) => {
         <button
           onClick={() => handleConnect('backpack')}
           disabled={busy}
-          className={`w-full rounded-lg p-4 flex items-center justify-between transition-colors ${busy ? 'opacity-60 cursor-not-allowed' : 'hover:opacity-90'}`}
+          className={`w-full rounded-lg p-4 flex items-center justify-between transition-colors ${
+            busy ? 'opacity-60 cursor-not-allowed' : 'hover:opacity-90'
+          }`}
           style={{ backgroundColor: '#F59E0B' }}
         >
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
-              <span style={{ fontFamily: 'Arial', fontWeight: 700, fontSize: 16, color: '#F59E0B' }}>B</span>
+              <span style={{ fontFamily: 'Arial', fontWeight: 700, fontSize: 16, color: '#F59E0B' }}>
+                B
+              </span>
             </div>
             <div className="text-left">
               <p style={{ fontFamily: 'Arial', fontSize: 14, color: '#FFFFFF' }}>Backpack</p>
+              <p style={{ fontFamily: 'Arial', fontSize: 12, color: '#FFFFFF' }}>Connect via extension</p>
+            </div>
+          </div>
+          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+
+        {/* Solflare */}
+        <button
+          onClick={() => handleConnect('solflare')}
+          disabled={busy}
+          className={`w-full rounded-lg p-4 flex items-center justify-between transition-colors ${
+            busy ? 'opacity-60 cursor-not-allowed' : 'hover:opacity-90'
+          }`}
+          style={{ backgroundColor: '#FF6B00' }} // laranja solflare
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
+              <span style={{ fontFamily: 'Arial', fontWeight: 700, fontSize: 16, color: '#FF6B00' }}>
+                S
+              </span>
+            </div>
+            <div className="text-left">
+              <p style={{ fontFamily: 'Arial', fontSize: 14, color: '#FFFFFF' }}>Solflare</p>
               <p style={{ fontFamily: 'Arial', fontSize: 12, color: '#FFFFFF' }}>Connect via extension</p>
             </div>
           </div>
@@ -140,7 +213,9 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onBack }) => {
         <button
           onClick={() => handleConnect('auto')}
           disabled={busy}
-          className={`w-full bg-dark-card rounded-lg p-4 flex items-center justify-between transition-colors ${busy ? 'opacity-60 cursor-not-allowed' : 'hover:bg-dark-card/80'}`}
+          className={`w-full bg-dark-card rounded-lg p-4 flex items-center justify-between transition-colors ${
+            busy ? 'opacity-60 cursor-not-allowed' : 'hover:bg-dark-card/80'
+          }`}
         >
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
@@ -152,7 +227,9 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onBack }) => {
             </div>
             <div className="text-left">
               <p style={{ fontFamily: 'Arial', fontSize: 14, color: '#FFFFFF' }}>Other wallets</p>
-              <p style={{ fontFamily: 'Arial', fontSize: 12, color: '#FFFFFF' }}>If installed, will prompt to connect</p>
+              <p style={{ fontFamily: 'Arial', fontSize: 12, color: '#FFFFFF' }}>
+                Tries Phantom → Backpack → Solflare
+              </p>
             </div>
           </div>
           <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

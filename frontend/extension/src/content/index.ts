@@ -1,28 +1,31 @@
 /// <reference types="chrome"/>
 
-// Content Script - Runs in the context of web pages
-console.log('🟢 Vetra content script loaded');
-console.log('📍 URL:', window.location.href);
+// Content Script — roda em todas as páginas
+console.log('🟢 Vetra content script loaded at', window.location.href);
 
-// Inject our script into the page context
-const script = document.createElement('script');
-// use the built artifact path for the injected script
-script.src = chrome.runtime.getURL('injected.js');
-script.onload = function () {
-  // @ts-ignore
-  this.remove?.();
-  console.log('✅ Injected script loaded successfully');
-};
-script.onerror = function () {
-  console.error('❌ Failed to load injected script');
-};
-(document.head || document.documentElement).appendChild(script);
-console.log('📝 Injected script element added to page');
+// 1) pede pro background injetar o script no contexto da página
+chrome.runtime.sendMessage({ type: 'INJECT_PAGE_SCRIPT' }, (res) => {
+  if (!res?.ok) {
+    console.error('❌ Failed to inject via scripting:', res?.error);
+  } else {
+    console.log('✅ Injected via chrome.scripting');
+  }
+});
 
-// ===== Bridge: CONNECT (popup/background -> content -> injected) =====
+// 2) Bridge: POPUP → CONTENT → INJECTED (conectar carteira)
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg?.type === 'VETRA_CONNECT') {
-    // unique correlation id
+  // aceitamos os dois tipos que você já usou no popup
+  if (msg?.type === 'VETRA_CONNECT' || msg?.type === 'VETRA_CONNECT_WALLET') {
+    // pode vir do popup como {payload: {provider: 'phantom' | 'backpack' | 'solflare' | 'auto'}}
+    const provider =
+      (msg?.payload?.provider as
+        | 'phantom'
+        | 'backpack'
+        | 'solflare'
+        | 'auto'
+        | undefined) || 'auto';
+
+    // id pra parear req/res
     const id =
       (crypto as any)?.randomUUID?.() ||
       Math.random().toString(36).slice(2);
@@ -31,35 +34,39 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       const data = ev.data || {};
       if (data?.type === 'VETRA_CONNECT_RES' && data.id === id) {
         window.removeEventListener('message', handler);
-        sendResponse(data); // { ok: boolean, publicKey?: string, error?: string }
+        // devolve pro popup exatamente o que o injected mandou
+        sendResponse(data);
       }
     };
 
     window.addEventListener('message', handler);
-    window.postMessage({ type: 'VETRA_CONNECT', id }, '*');
 
-    // keep the channel open for async sendResponse
+    // manda pro contexto da página (injected.js vai ouvir isso)
+    window.postMessage(
+      {
+        type: 'VETRA_CONNECT',
+        id,
+        provider,
+      },
+      '*'
+    );
+
+    // importante: manter o canal aberto pq a resposta vem depois
     return true;
   }
 });
 
-// ===== Bridge: TRANSACTION ANALYSIS (injected -> content -> background) =====
+// 3) Bridge: INJECTED → CONTENT → BACKGROUND (analisar transação)
 window.addEventListener('message', async (event) => {
-  // Only accept messages from same window
   if (event.source !== window) return;
-
   const message = event.data;
 
   if (message?.type === 'VETRA_TRANSACTION_REQUEST') {
-    console.log('🧪 Intercepted transaction:', message.payload);
-
-    // Send to background for analysis (MVP: stub approves)
     const response = await chrome.runtime.sendMessage({
       type: 'ANALYZE_TRANSACTION',
       payload: message.payload,
     });
 
-    // Send response back to injected script
     window.postMessage(
       {
         type: 'VETRA_TRANSACTION_RESPONSE',
@@ -69,11 +76,6 @@ window.addEventListener('message', async (event) => {
       '*'
     );
   }
-});
-
-chrome.runtime.sendMessage({ type: 'INJECT_PAGE_SCRIPT' }, (res) => {
-  if (!res?.ok) console.error('❌ Failed to inject via scripting:', res?.error);
-  else console.log('✅ Injected via chrome.scripting');
 });
 
 export {};
