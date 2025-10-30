@@ -635,11 +635,11 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
               className={`w-12 h-6 rounded-full transition-colors ${
                 shareInsights ? 'bg-yellow-500' : 'bg-gray-600'
               }`}
-                onClick={() => {
-                  const newValue = !shareInsights;
-                  setShareInsights(newValue);
-                  saveSettingToBackend('shareInsights', newValue);
-                }}
+              onClick={() => {
+                const newValue = !shareInsights;
+                setShareInsights(newValue);
+                saveSettingToBackend('shareInsights', newValue);
+              }}
             >
               <div
                 className={`w-5 h-5 bg-white rounded-full transition-transform ${
@@ -695,11 +695,11 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
               className={`w-12 h-6 rounded-full transition-colors ${
                 transactionMemory ? 'bg-yellow-500' : 'bg-gray-600'
               }`}
-                onClick={() => {
-                  const newValue = !transactionMemory;
-                  setTransactionMemory(newValue);
-                  saveSettingToBackend('transactionMemory', newValue);
-                }}
+              onClick={() => {
+                const newValue = !transactionMemory;
+                setTransactionMemory(newValue);
+                saveSettingToBackend('transactionMemory', newValue);
+              }}
             >
               <div
                 className={`w-5 h-5 bg-white rounded-full transition-transform ${
@@ -741,11 +741,11 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
               className={`w-12 h-6 rounded-full transition-colors ${
                 smartContractFingerprints ? 'bg-yellow-500' : 'bg-gray-600'
               }`}
-                onClick={() => {
-                  const newValue = !smartContractFingerprints;
-                  setSmartContractFingerprints(newValue);
-                  saveSettingToBackend('smartContractFingerprints', newValue);
-                }}
+              onClick={() => {
+                const newValue = !smartContractFingerprints;
+                setSmartContractFingerprints(newValue);
+                saveSettingToBackend('smartContractFingerprints', newValue);
+              }}
             >
               <div
                 className={`w-5 h-5 bg-white rounded-full transition-transform ${
