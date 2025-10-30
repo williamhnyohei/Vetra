@@ -85,30 +85,20 @@ const OUTPUT_SCHEMA = {
 
   // Detailed analysis by agent
   agent_analysis: {
-    token_agent: {
+    phishing_agent: {
       score: 'number (0-100)',
       findings: 'array of strings',
       severity: 'string', // low, medium, high
     },
-    address_agent: {
+    transaction_agent: {
       score: 'number (0-100)',
       findings: 'array of strings',
       severity: 'string',
     },
-    pattern_agent: {
+    rugpull_agent: {
       score: 'number (0-100)',
       findings: 'array of strings',
       severity: 'string',
-    },
-    network_agent: {
-      score: 'number (0-100)',
-      findings: 'array of strings',
-      severity: 'string',
-    },
-    ml_agent: {
-      score: 'number (0-100)',
-      prediction: 'string',
-      confidence: 'number (0-1)',
     },
   },
 
@@ -118,7 +108,7 @@ const OUTPUT_SCHEMA = {
       factor: 'string', // Factor name
       severity: 'string', // low, medium, high
       description: 'string', // Human-readable description
-      weight: 'number (0-1)', // Impact on final score
+     // weight: 'number (0-1)', // Impact on final score
     },
   ],
 
