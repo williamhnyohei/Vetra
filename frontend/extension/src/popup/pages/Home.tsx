@@ -254,7 +254,7 @@ const Home: React.FC<HomeProps> = ({ onNavigateToConnectWallet, onNavigateToPlan
                           color: '#858C94'
                         }}
                       >
-                        {tx.amount ? `${(parseFloat(tx.amount) / 1e9).toFixed(4)} SOL` : tx.type}
+                        {tx.amount ? `${(parseFloat(tx.amount) / 1e9).toFixed(6)} SOL` : tx.type}
                       </p>
                     </div>
                   </div>
