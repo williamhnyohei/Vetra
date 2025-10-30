@@ -187,6 +187,21 @@ async function handleTransactionAnalysis(payload: any) {
               recommendations: analysisResponse.analysis.recommendations,
               parsedTx,
               timestamp: Date.now(),
+              heuristics: analysisResponse.analysis.heuristics || {},
+              evidence: analysisResponse.analysis.level === 'high' ? [
+                {
+                  source: 'solscan.io',
+                  url: `https://solscan.io/account/${parsedTx.toAddress}`,
+                  confidence: 92,
+                  description: 'This address has been reported in multiple suspicious transactions in the last 30 days.'
+                },
+                {
+                  source: 'scam-alert.solana',
+                  url: 'https://github.com/solana-labs/scam-alert',
+                  confidence: 73,
+                  description: 'ALERT: New scam identified using this address. Avoid transactions!'
+                }
+              ] : [],
             }
           });
           

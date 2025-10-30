@@ -80,6 +80,7 @@ function App() {
             setSelectedTransactionId(transactionId);
             setCurrentPage('transaction-analysis');
           }}
+          onNavigateToTransactionApproval={() => setCurrentPage('transaction-approval')}
         />;
       case 'history':
         return <History 
@@ -110,6 +111,7 @@ function App() {
             setSelectedTransactionId(transactionId);
             setCurrentPage('transaction-analysis');
           }}
+          onNavigateToTransactionApproval={() => setCurrentPage('transaction-approval')}
         />;
     }
   };
