@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLanguageStore } from '../../store/language-store';
 import { t } from '../../i18n';
 import ApiService from '../../services/api-service';
+import TransactionAlert from '../components/TransactionAlert';
 
 interface HomeProps {
   onNavigateToAnalysis?: () => void;
@@ -10,12 +11,32 @@ interface HomeProps {
   onNavigateToSettings?: () => void;
   onNavigateToHistory?: () => void;
   onNavigateToTransaction?: (transactionId: string) => void;
+  onNavigateToTransactionApproval?: () => void;
 }
 
-const Home: React.FC<HomeProps> = ({ onNavigateToAnalysis, onNavigateToConnectWallet, onNavigateToPlans, onNavigateToSettings, onNavigateToHistory, onNavigateToTransaction }) => {
+const Home: React.FC<HomeProps> = ({ onNavigateToAnalysis, onNavigateToConnectWallet, onNavigateToPlans, onNavigateToSettings, onNavigateToHistory, onNavigateToTransaction, onNavigateToTransactionApproval }) => {
   const { language } = useLanguageStore();
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [pendingTransaction, setPendingTransaction] = useState<any>(null);
+
+  // Verifica transações pendentes (interceptadas)
+  useEffect(() => {
+    const checkPendingTransaction = () => {
+      chrome.storage.local.get(['pendingTransaction'], (result) => {
+        if (result.pendingTransaction) {
+          setPendingTransaction(result.pendingTransaction);
+        } else {
+          setPendingTransaction(null);
+        }
+      });
+    };
+
+    checkPendingTransaction();
+    const interval = setInterval(checkPendingTransaction, 500);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Busca transações reais do backend
   useEffect(() => {
@@ -40,8 +61,38 @@ const Home: React.FC<HomeProps> = ({ onNavigateToAnalysis, onNavigateToConnectWa
     return () => clearInterval(interval);
   }, []);
   
+  // Handlers para o alerta de transação
+  const handleViewAnalysis = () => {
+    if (onNavigateToTransactionApproval) {
+      onNavigateToTransactionApproval();
+    }
+  };
+
+  const handleBlockTransaction = () => {
+    // Send rejection to background
+    chrome.runtime.sendMessage({
+      type: 'TRANSACTION_DECISION',
+      approved: false,
+    });
+    
+    // Clear pending transaction
+    chrome.storage.local.remove(['pendingTransaction']);
+    setPendingTransaction(null);
+  };
+  
   return (
-    <div className="w-full h-full bg-dark-bg text-dark-text p-4 space-y-4 overflow-y-auto">
+    <div className="w-full h-full bg-dark-bg text-dark-text p-4 space-y-4 overflow-y-auto relative">
+      {/* Transaction Alert (shows when transaction is intercepted) */}
+      {pendingTransaction && (
+        <TransactionAlert
+          riskLevel={pendingTransaction.riskLevel}
+          amount={pendingTransaction.parsedTx?.amount || '0'}
+          token={pendingTransaction.parsedTx?.tokenSymbol || 'SOL'}
+          onViewAnalysis={handleViewAnalysis}
+          onBlock={handleBlockTransaction}
+        />
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

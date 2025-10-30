@@ -59,29 +59,33 @@ router.post('/analyze', optionalAuth, [
     // Cache the analysis
     await cache.set(cacheKey, analysis, 3600); // 1 hour
 
-    let transaction = null;
+    // SEMPRE salva no banco (mesmo sem autenticação)
+    // Se não tiver userId, salva como NULL (transação anônima)
+    const [transaction] = await db('transactions')
+      .insert({
+        user_id: userId || null, // Permite NULL para usuários não autenticados
+        signature: transactionData.signature,
+        transaction_hash: transactionData.signature,
+        type: transactionData.type,
+        from_address: transactionData.from,
+        to_address: transactionData.to,
+        amount: transactionData.amount,
+        token_address: transactionData.token,
+        risk_score: analysis.score,
+        risk_level: analysis.level,
+        risk_reasons: analysis.reasons,
+        heuristics: analysis.heuristics,
+        status: 'pending',
+        analyzed_at: new Date(),
+      })
+      .returning('*');
     
-    // Only store in database if user is authenticated
-    if (userId) {
-      [transaction] = await db('transactions')
-        .insert({
-          user_id: userId,
-          signature: transactionData.signature,
-          transaction_hash: transactionData.signature,
-          type: transactionData.type,
-          from_address: transactionData.from,
-          to_address: transactionData.to,
-          amount: transactionData.amount,
-          token_address: transactionData.token,
-          risk_score: analysis.score,
-          risk_level: analysis.level,
-          risk_reasons: analysis.reasons,
-          heuristics: analysis.heuristics,
-          status: 'pending',
-          analyzed_at: new Date(),
-        })
-        .returning('*');
-    }
+    logger.info('✅ Transaction saved to database', {
+      transactionId: transaction.id,
+      userId: userId || 'anonymous',
+      riskLevel: analysis.level,
+      riskScore: analysis.score,
+    });
 
     res.json({
       success: true,
