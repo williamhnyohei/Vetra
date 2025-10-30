@@ -78,24 +78,59 @@ function parseTransferInstruction(instruction: any): {
     // Para System Program Transfer
     if (instruction.programId.equals(SystemProgram.programId)) {
       const keys = instruction.keys;
+      console.log('🔍 System Program Transfer - Keys:', keys.length);
+      
       if (keys.length >= 2) {
-        return {
-          from: keys[0].pubkey.toBase58(),
-          to: keys[1].pubkey.toBase58(),
-          amount: instruction.data ? instruction.data.readBigUInt64LE?.(1)?.toString() : undefined,
-        };
+        const from = keys[0].pubkey.toBase58();
+        const to = keys[1].pubkey.toBase58();
+        
+        // Try to extract amount from instruction data
+        let amount: string | undefined;
+        if (instruction.data && instruction.data.length >= 12) {
+          try {
+            // SystemProgram Transfer: u32 instruction index + u64 lamports
+            // Skip first 4 bytes (instruction index), read next 8 bytes (amount)
+            const dataBuffer = Buffer.from(instruction.data);
+            const lamports = dataBuffer.readBigUInt64LE(4);
+            amount = lamports.toString();
+            console.log('💰 Extracted amount (lamports):', amount);
+          } catch (error) {
+            console.error('Error reading amount from buffer:', error);
+          }
+        }
+        
+        console.log('📤 From:', from);
+        console.log('📥 To:', to);
+        
+        return { from, to, amount };
       }
     }
     
     // Para Token Program Transfer
     if (instruction.programId.equals(TOKEN_PROGRAM_ID)) {
       const keys = instruction.keys;
+      console.log('🔍 Token Program Transfer - Keys:', keys.length);
+      
       if (keys.length >= 3) {
-        return {
-          from: keys[0].pubkey.toBase58(), // Source account
-          to: keys[1].pubkey.toBase58(),   // Destination account
-          amount: instruction.data ? instruction.data.readBigUInt64LE?.(1)?.toString() : undefined,
-        };
+        const from = keys[0].pubkey.toBase58();
+        const to = keys[1].pubkey.toBase58();
+        
+        let amount: string | undefined;
+        if (instruction.data && instruction.data.length >= 9) {
+          try {
+            const dataBuffer = Buffer.from(instruction.data);
+            const tokens = dataBuffer.readBigUInt64LE(1);
+            amount = tokens.toString();
+            console.log('💰 Extracted token amount:', amount);
+          } catch (error) {
+            console.error('Error reading token amount from buffer:', error);
+          }
+        }
+        
+        console.log('📤 From (token account):', from);
+        console.log('📥 To (token account):', to);
+        
+        return { from, to, amount };
       }
     }
   } catch (error) {
@@ -130,8 +165,11 @@ export function parseTransaction(transaction: Transaction): ParsedTransaction {
       const firstInstruction = instructions[0];
       const programId = firstInstruction.programId.toBase58();
       
+      console.log('🔍 Analyzing instruction with programId:', programId);
+      
       if (programId === SystemProgram.programId.toBase58()) {
         const instructionType = getSystemInstructionType(firstInstruction);
+        console.log('📋 System instruction type:', instructionType);
         
         // Map system instruction types to DB enum values
         if (instructionType === 'Transfer' || instructionType.toLowerCase() === 'transfer') {
@@ -160,8 +198,29 @@ export function parseTransaction(transaction: Transaction): ParsedTransaction {
       } else if (programId === 'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4') {
         // Jupiter = swap
         transactionType = 'swap';
+        
+        // Try to extract addresses from Jupiter swap
+        if (firstInstruction.keys.length >= 2) {
+          fromAddress = firstInstruction.keys[0].pubkey.toBase58();
+          toAddress = firstInstruction.keys[1].pubkey.toBase58();
+        }
       } else if (KNOWN_PROGRAMS[programId]) {
         transactionType = 'other'; // Other known programs
+      }
+    }
+    
+    // Fallback: use feePayer as fromAddress if not set
+    if (!fromAddress && transaction.feePayer) {
+      fromAddress = transaction.feePayer.toBase58();
+      console.log('⚠️ Using feePayer as fromAddress:', fromAddress);
+    }
+    
+    // Fallback: use first writable account as toAddress if not set
+    if (!toAddress && instructions.length > 0) {
+      const firstWritableKey = instructions[0].keys.find(k => k.isWritable && k.pubkey.toBase58() !== fromAddress);
+      if (firstWritableKey) {
+        toAddress = firstWritableKey.pubkey.toBase58();
+        console.log('⚠️ Using first writable account as toAddress:', toAddress);
       }
     }
     

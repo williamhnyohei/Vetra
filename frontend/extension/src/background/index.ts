@@ -111,12 +111,20 @@ async function handleTransactionAnalysis(payload: any) {
     
     // Parse the transaction from the payload
     const transaction = reconstructTransaction(payload.transaction);
+    console.log('🔍 Reconstructed transaction:', {
+      instructions: transaction.instructions.length,
+      feePayer: transaction.feePayer?.toBase58(),
+      recentBlockhash: transaction.recentBlockhash
+    });
+    
     const parsedTx = parseTransaction(transaction);
     
     console.log('📊 Parsed transaction:', parsedTx);
     console.log('💰 Amount:', parsedTx.amount);
     console.log('📤 From:', parsedTx.fromAddress);
     console.log('📥 To:', parsedTx.toAddress);
+    console.log('🔧 Type:', parsedTx.type);
+    console.log('📋 Instructions:', parsedTx.instructions.length);
     
     // Prepare transaction data for API
     const transactionData = {
@@ -161,6 +169,28 @@ async function handleTransactionAnalysis(payload: any) {
     // SEMPRE armazena transação para mostrar alerta (independente do risco)
     console.log(`📊 Transaction Risk: ${riskLevel.toUpperCase()} (${analysisResponse.analysis.score}/100)`);
     
+    // Convert lamports to SOL for display
+    let displayAmount = '0';
+    let displayTokenSymbol = 'SOL';
+    
+    if (parsedTx.amount && parsedTx.amount !== '0') {
+      try {
+        const lamports = BigInt(parsedTx.amount);
+        const sol = Number(lamports) / 1e9; // Convert lamports to SOL
+        displayAmount = sol.toFixed(4);
+      } catch (error) {
+        console.error('Error converting amount:', error);
+        displayAmount = parsedTx.amount;
+      }
+    }
+    
+    // Determine token symbol
+    if (parsedTx.tokenAddress && parsedTx.tokenAddress !== SystemProgram.programId.toBase58()) {
+      displayTokenSymbol = 'TOKEN'; // For SPL tokens
+    } else {
+      displayTokenSymbol = 'SOL';
+    }
+    
     // Store transaction data for popup to access (ALWAYS, not just high risk)
     await chrome.storage.local.set({
       pendingTransaction: {
@@ -169,13 +199,17 @@ async function handleTransactionAnalysis(payload: any) {
         riskLevel: analysisResponse.analysis.level,
         reasons: analysisResponse.analysis.reasons,
         recommendations: analysisResponse.analysis.recommendations,
-        parsedTx,
+        parsedTx: {
+          ...parsedTx,
+          amount: displayAmount,
+          tokenSymbol: displayTokenSymbol,
+        },
         timestamp: Date.now(),
         heuristics: analysisResponse.analysis.heuristics || {},
         evidence: analysisResponse.analysis.level === 'high' ? [
           {
             source: 'solscan.io',
-            url: `https://solscan.io/account/${parsedTx.toAddress}`,
+            url: `https://solscan.io/account/${parsedTx.toAddress || 'unknown'}`,
             confidence: 92,
             description: 'This address has been reported in multiple suspicious transactions in the last 30 days.'
           },
