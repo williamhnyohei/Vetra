@@ -73,8 +73,8 @@ router.post('/analyze', optionalAuth, [
         token_address: transactionData.token,
         risk_score: analysis.score,
         risk_level: analysis.level,
-        risk_reasons: analysis.reasons,
-        heuristics: analysis.heuristics,
+        risk_reasons: JSON.stringify(analysis.reasons || []), // Ensure valid JSON string
+        heuristics: JSON.stringify(analysis.heuristics || {}), // Ensure valid JSON string
         status: 'pending',
         analyzed_at: new Date(),
       })

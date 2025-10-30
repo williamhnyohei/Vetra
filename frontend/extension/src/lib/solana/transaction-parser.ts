@@ -119,7 +119,7 @@ export function parseTransaction(transaction: Transaction): ParsedTransaction {
     const uniqueAccounts = [...new Set(accounts)];
     
     // Identifica o tipo de transação baseado nos programas usados
-    let transactionType = 'Unknown';
+    let transactionType = 'other'; // Default to 'other' (valid DB enum value)
     let fromAddress: string | undefined;
     let toAddress: string | undefined;
     let amount: string | undefined;
@@ -132,7 +132,13 @@ export function parseTransaction(transaction: Transaction): ParsedTransaction {
       
       if (programId === SystemProgram.programId.toBase58()) {
         const instructionType = getSystemInstructionType(firstInstruction);
-        transactionType = instructionType;
+        
+        // Map system instruction types to DB enum values
+        if (instructionType === 'Transfer' || instructionType.toLowerCase() === 'transfer') {
+          transactionType = 'transfer';
+        } else {
+          transactionType = 'other';
+        }
         
         if (instructionType === 'Transfer') {
           const transferInfo = parseTransferInstruction(firstInstruction);
@@ -141,7 +147,7 @@ export function parseTransaction(transaction: Transaction): ParsedTransaction {
           amount = transferInfo.amount;
         }
       } else if (programId === TOKEN_PROGRAM_ID.toBase58()) {
-        transactionType = 'TokenTransfer';
+        transactionType = 'transfer'; // Token transfer is still a transfer
         const transferInfo = parseTransferInstruction(firstInstruction);
         fromAddress = transferInfo.from;
         toAddress = transferInfo.to;
@@ -151,8 +157,11 @@ export function parseTransaction(transaction: Transaction): ParsedTransaction {
         if (firstInstruction.keys.length > 0) {
           tokenAddress = firstInstruction.keys[0].pubkey.toBase58();
         }
+      } else if (programId === 'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4') {
+        // Jupiter = swap
+        transactionType = 'swap';
       } else if (KNOWN_PROGRAMS[programId]) {
-        transactionType = KNOWN_PROGRAMS[programId];
+        transactionType = 'other'; // Other known programs
       }
     }
     
