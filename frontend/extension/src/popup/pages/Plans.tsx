@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useLanguageStore } from '../../store/language-store';
+import { t } from '../../i18n';
 import ApiService from '../../services/api-service';
 
 interface PlansProps {
@@ -6,6 +8,7 @@ interface PlansProps {
 }
 
 const Plans: React.FC<PlansProps> = ({ onBack }) => {
+  const { language } = useLanguageStore();
   const [isUpgrading, setIsUpgrading] = useState(false);
   const [upgradeSuccess, setUpgradeSuccess] = useState(false);
 
@@ -55,7 +58,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
               color: '#E6E6E6'
             }}
           >
-            Choose your plan
+            {t('plans.title', language)}
           </h1>
         </div>
       </div>
@@ -73,7 +76,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
               color: '#E6E6E6'
             }}
           >
-            FREE
+            {t('plans.free', language)}
           </h2>
           <span 
             style={{
@@ -85,7 +88,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
               color: '#858C94'
             }}
           >
-            Current plan
+            {t('plans.currentPlan', language)}
           </span>
         </div>
         
@@ -100,7 +103,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
               color: '#E6E6E6'
             }}
           >
-            $0
+            {t('plans.price.free', language)}
           </p>
           <p 
             style={{
@@ -112,7 +115,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
               color: '#E6E6E6'
             }}
           >
-            Basic protection to get started
+            {t('plans.description.free', language)}
           </p>
         </div>
 
@@ -131,7 +134,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
                 color: '#E6E6E6'
               }}
             >
-              Basic risk analysis
+              {t('plans.features.basicRiskAnalysis', language)}
             </span>
           </div>
           
@@ -149,7 +152,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
                 color: '#E6E6E6'
               }}
             >
-              7-day history
+              {t('plans.features.sevenDayHistory', language)}
             </span>
           </div>
           
@@ -167,7 +170,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
                 color: '#E6E6E6'
               }}
             >
-              Up to 10 interceptions/day
+              {t('plans.features.tenInterceptionsPerDay', language)}
             </span>
           </div>
           
@@ -185,7 +188,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
                 color: '#E6E6E6'
               }}
             >
-              Evidence from 2 sources
+              {t('plans.features.evidenceTwoSources', language)}
             </span>
           </div>
           
@@ -203,7 +206,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
                 color: '#E6E6E6'
               }}
             >
-              Email support
+              {t('plans.features.emailSupport', language)}
             </span>
           </div>
         </div>
@@ -224,7 +227,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
               color: '#1A141F'
             }}
           >
-            RECOMMENDED
+            {t('plans.recommended', language)}
           </div>
         </div>
         
@@ -239,7 +242,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
               color: '#E6E6E6'
             }}
           >
-            PRO
+            {t('plans.pro', language)}
           </h2>
           <p 
             style={{
@@ -251,7 +254,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
               color: '#E6E6E6'
             }}
           >
-            Pay as you go
+            {t('plans.price.payAsYouGo', language)}
           </p>
           <p 
             style={{
@@ -263,7 +266,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
               color: '#E6E6E6'
             }}
           >
-            Pay only for what you use (GPT 4.0/5.0)
+            {t('plans.description.pro', language)}
           </p>
         </div>
 
@@ -282,7 +285,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
                 color: '#E6E6E6'
               }}
             >
-              Advanced analysis with AI
+              {t('plans.features.advancedAnalysisAI', language)}
             </span>
           </div>
           
@@ -300,7 +303,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
                 color: '#E6E6E6'
               }}
             >
-              Unlimited history
+              {t('plans.features.unlimitedHistory', language)}
             </span>
           </div>
           
@@ -318,7 +321,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
                 color: '#E6E6E6'
               }}
             >
-              Unlimited interceptions
+              {t('plans.features.unlimitedInterceptions', language)}
             </span>
           </div>
           
@@ -336,7 +339,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
                 color: '#E6E6E6'
               }}
             >
-              Evidence from multiple sources
+              {t('plans.features.evidenceMultipleSources', language)}
             </span>
           </div>
           
@@ -354,7 +357,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
                 color: '#E6E6E6'
               }}
             >
-              Transaction memory
+              {t('plans.features.transactionMemory', language)}
             </span>
           </div>
           
@@ -372,7 +375,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
                 color: '#E6E6E6'
               }}
             >
-              Automatic rules
+              {t('plans.features.automaticRules', language)}
             </span>
           </div>
           
@@ -390,7 +393,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
                 color: '#E6E6E6'
               }}
             >
-              Integration with Wallet *
+              {t('plans.features.walletIntegration', language)}
             </span>
           </div>
           
@@ -408,7 +411,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
                 color: '#E6E6E6'
               }}
             >
-              Priority support
+              {t('plans.features.prioritySupport', language)}
             </span>
           </div>
         </div>
@@ -428,7 +431,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
           onClick={handleUpgrade}
           disabled={isUpgrading || upgradeSuccess}
         >
-          {upgradeSuccess ? '✅ Upgraded!' : isUpgrading ? 'Upgrading...' : 'Upgrade to Pro'}
+          {upgradeSuccess ? t('plans.button.upgraded', language) : isUpgrading ? t('plans.button.upgrading', language) : t('plans.button.upgrade', language)}
         </button>
         
         <p 
@@ -442,7 +445,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
             textAlign: 'center'
           }}
         >
-          30-day guarantee - Cancel anytime
+          {t('plans.guarantee', language)}
         </p>
       </div>
 
@@ -463,7 +466,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
               marginBottom: '8px'
             }}
           >
-            Why choose Pro?
+            {t('plans.whyPro.title', language)}
           </h3>
           <p 
             style={{
@@ -475,7 +478,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
               color: '#E6E6E6'
             }}
           >
-            With the Pro plan, you gain greater accuracy in analyses using cutting-edge AI models, memory of previous transactions for better pattern detection, and complete control with customized automatic rules.
+            {t('plans.whyPro.description', language)}
           </p>
         </div>
       </div>

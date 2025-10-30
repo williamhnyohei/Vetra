@@ -92,5 +92,45 @@
     "disconnectWallet": "Desconectar Carteira",
     "logoutAccount": "Sair da conta",
     "privacy": "Suas chaves privadas permanecem seguras. Vetra nunca solicita ou armazena suas credenciais."
+  },
+  "plans": {
+    "title": "Escolha seu plano",
+    "free": "GRÁTIS",
+    "pro": "PRO",
+    "currentPlan": "Plano atual",
+    "recommended": "RECOMENDADO",
+    "price": {
+      "free": "R$ 0",
+      "payAsYouGo": "Pague conforme usar"
+    },
+    "description": {
+      "free": "Proteção básica para começar",
+      "pro": "Pague apenas pelo que usar (GPT 4.0/5.0)"
+    },
+    "features": {
+      "basicRiskAnalysis": "Análise básica de risco",
+      "sevenDayHistory": "Histórico de 7 dias",
+      "tenInterceptionsPerDay": "Até 10 interceptações/dia",
+      "evidenceTwoSources": "Evidências de 2 fontes",
+      "emailSupport": "Suporte por email",
+      "advancedAnalysisAI": "Análise avançada com IA",
+      "unlimitedHistory": "Histórico ilimitado",
+      "unlimitedInterceptions": "Interceptações ilimitadas",
+      "evidenceMultipleSources": "Evidências de múltiplas fontes",
+      "transactionMemory": "Memória de transações",
+      "automaticRules": "Regras automáticas",
+      "walletIntegration": "Integração com Carteira *",
+      "prioritySupport": "Suporte prioritário"
+    },
+    "button": {
+      "upgrade": "Atualizar para Pro",
+      "upgrading": "Atualizando...",
+      "upgraded": "✅ Atualizado!"
+    },
+    "guarantee": "Garantia de 30 dias - Cancele a qualquer momento",
+    "whyPro": {
+      "title": "Por que escolher Pro?",
+      "description": "Com o plano Pro, você ganha maior precisão nas análises usando modelos de IA de ponta, memória de transações anteriores para melhor detecção de padrões, e controle completo com regras automáticas personalizadas."
+    }
   }
 }

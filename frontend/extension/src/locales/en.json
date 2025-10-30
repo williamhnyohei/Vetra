@@ -92,5 +92,45 @@
     "disconnectWallet": "Disconnect Wallet",
     "logoutAccount": "Log out of account",
     "privacy": "Your private keys remain secure. Vetra never solicits or stores your credentials."
+  },
+  "plans": {
+    "title": "Choose your plan",
+    "free": "FREE",
+    "pro": "PRO",
+    "currentPlan": "Current plan",
+    "recommended": "RECOMMENDED",
+    "price": {
+      "free": "$0",
+      "payAsYouGo": "Pay as you go"
+    },
+    "description": {
+      "free": "Basic protection to get started",
+      "pro": "Pay only for what you use (GPT 4.0/5.0)"
+    },
+    "features": {
+      "basicRiskAnalysis": "Basic risk analysis",
+      "sevenDayHistory": "7-day history",
+      "tenInterceptionsPerDay": "Up to 10 interceptions/day",
+      "evidenceTwoSources": "Evidence from 2 sources",
+      "emailSupport": "Email support",
+      "advancedAnalysisAI": "Advanced analysis with AI",
+      "unlimitedHistory": "Unlimited history",
+      "unlimitedInterceptions": "Unlimited interceptions",
+      "evidenceMultipleSources": "Evidence from multiple sources",
+      "transactionMemory": "Transaction memory",
+      "automaticRules": "Automatic rules",
+      "walletIntegration": "Integration with Wallet *",
+      "prioritySupport": "Priority support"
+    },
+    "button": {
+      "upgrade": "Upgrade to Pro",
+      "upgrading": "Upgrading...",
+      "upgraded": "✅ Upgraded!"
+    },
+    "guarantee": "30-day guarantee - Cancel anytime",
+    "whyPro": {
+      "title": "Why choose Pro?",
+      "description": "With the Pro plan, you gain greater accuracy in analyses using cutting-edge AI models, memory of previous transactions for better pattern detection, and complete control with customized automatic rules."
+    }
   }
 }

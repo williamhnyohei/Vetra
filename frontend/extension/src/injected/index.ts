@@ -1,44 +1,105 @@
 // Injected Script - Runs in page context, has access to window.solana
 console.log('🟣 Vetra injected script loaded');
 console.log('🔍 Checking for window.solana...');
+console.log('🌐 Network: Solana Mainnet');
+
+// Serialize transaction to safely pass through messages
+function serializeTransaction(transaction: any): any {
+  try {
+    // If transaction has serialize method, use it
+    if (transaction && typeof transaction.serialize === 'function') {
+      const serialized = transaction.serialize();
+      return {
+        serialized: Buffer.from(serialized).toString('base64'),
+        type: 'serialized',
+      };
+    }
+    
+    // Extract key properties if it's a transaction object
+    if (transaction && typeof transaction === 'object') {
+      return {
+        instructions: transaction.instructions || [],
+        recentBlockhash: transaction.recentBlockhash || null,
+        feePayer: transaction.feePayer ? transaction.feePayer.toString() : null,
+        signatures: transaction.signatures || [],
+        type: 'object',
+      };
+    }
+    
+    return transaction;
+  } catch (error) {
+    console.error('Error serializing transaction:', error);
+    return { error: 'Failed to serialize transaction' };
+  }
+}
 
 // Function to wrap solana provider
 function wrapSolanaProvider(solanaProvider: any) {
   console.log('✅ Wrapping window.solana provider...');
   console.log('📦 Original Solana:', solanaProvider);
 
+  // Intercept methods that sign/send transactions
+  const methodsToIntercept = [
+    'signTransaction',
+    'signAllTransactions',
+    'signAndSendTransaction',
+    'sendTransaction',
+    'request' // For generic wallet adapter requests
+  ];
+
   // Create proxy to intercept method calls
   const wrappedSolana = new Proxy(solanaProvider, {
     get(target, prop) {
       const original = target[prop];
 
-      // Intercept signTransaction and signAllTransactions
-      if (prop === 'signTransaction' || prop === 'signAllTransactions') {
+      // Intercept transaction signing/sending methods
+      if (methodsToIntercept.includes(String(prop))) {
         return async function (...args: any[]) {
-          console.log(`🎯 INTERCEPTED ${String(prop)}!!!`, args);
-          console.log('📦 Transaction object:', args[0]);
+          console.log(`🎯 INTERCEPTED ${String(prop)}!!!`);
+          console.log('📦 Arguments:', args);
+
+          // Determine transaction from arguments based on method
+          let transactionData = null;
+          
+          if (prop === 'request' && args[0]?.method === 'signTransaction') {
+            transactionData = args[0]?.params?.transaction;
+          } else if (prop === 'signAllTransactions') {
+            // For signAllTransactions, analyze the first transaction
+            transactionData = args[0]?.[0];
+          } else {
+            // For other methods, transaction is usually first argument
+            transactionData = args[0];
+          }
 
           // Generate request ID
-          const requestId = Math.random().toString(36).substring(7);
+          const requestId = `vetra_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
+          console.log('📤 Sending transaction for analysis...');
+          
+          // Serialize transaction for safe message passing
+          const serializedTx = serializeTransaction(transactionData);
+          
           // Send to content script for analysis
           window.postMessage(
             {
               type: 'VETRA_TRANSACTION_REQUEST',
               id: requestId,
               payload: {
-                method: prop,
-                transaction: args[0], // Transaction object
+                method: String(prop),
+                transaction: serializedTx,
+                url: window.location.href,
+                timestamp: Date.now(),
               },
             },
             '*'
           );
 
           // Wait for response (with timeout)
-          const response = await new Promise((resolve) => {
+          const response: any = await new Promise((resolve) => {
             const timeout = setTimeout(() => {
-              resolve({ approved: true }); // Default to allow if timeout
-            }, 5000);
+              console.warn('⏰ Analysis timeout - allowing transaction');
+              resolve({ approved: true, reason: 'timeout' });
+            }, 10000); // 10 second timeout
 
             const listener = (event: MessageEvent) => {
               if (
@@ -55,13 +116,27 @@ function wrapSolanaProvider(solanaProvider: any) {
             window.addEventListener('message', listener);
           });
 
-          console.log('Transaction analysis response:', response);
+          console.log('📥 Transaction analysis response:', response);
+          
+          // Display risk information
+          if (response.riskScore !== undefined) {
+            console.log(`⚠️ Risk Score: ${response.riskScore}/100`);
+            console.log(`📊 Risk Level: ${response.riskLevel}`);
+            if (response.reasons) {
+              console.log('🔍 Risk Reasons:', response.reasons);
+            }
+          }
 
-          // For now, always allow - TODO: Show approval UI
+          // For now, always allow - the background script will open popup for high risk
+          // TODO: In future, could block transaction based on user settings
           return original.apply(target, args);
         };
       }
 
+      // Return original property/method
+      if (typeof original === 'function') {
+        return original.bind(target);
+      }
       return original;
     },
   });
@@ -75,6 +150,7 @@ function wrapSolanaProvider(solanaProvider: any) {
 
   console.log('✅ window.solana wrapped successfully!');
   console.log('🔗 New window.solana:', wrappedSolana);
+  console.log('🛡️ Vetra protection active on Solana Mainnet');
   
   return wrappedSolana;
 }
