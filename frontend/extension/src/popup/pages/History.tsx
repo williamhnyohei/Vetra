@@ -10,7 +10,7 @@ const History: React.FC<HistoryProps> = ({ onBack, onNavigateToPlans }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [isFreePlan] = useState(true); // Simulate Free plan
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
 
   // Busca transações reais do backend
@@ -27,8 +27,6 @@ const History: React.FC<HistoryProps> = ({ onBack, onNavigateToPlans }) => {
       } catch (error) {
         console.error('Error fetching transactions:', error);
         setAllTransactions([]);
-      } finally {
-        setLoading(false);
       }
     };
 

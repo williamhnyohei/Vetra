@@ -15,13 +15,12 @@ interface HomeProps {
 const Home: React.FC<HomeProps> = ({ onNavigateToAnalysis, onNavigateToConnectWallet, onNavigateToPlans, onNavigateToSettings, onNavigateToHistory, onNavigateToTransaction }) => {
   const { language } = useLanguageStore();
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // Busca transações reais do backend
   useEffect(() => {
     const fetchTransactions = async () => {
       try {
-        setLoading(true);
         const apiService = ApiService.getInstance();
         const response = await apiService.getTransactionHistory({ limit: 3 });
         console.log('📊 Transactions loaded:', response.transactions);
@@ -30,8 +29,6 @@ const Home: React.FC<HomeProps> = ({ onNavigateToAnalysis, onNavigateToConnectWa
         console.error('Error fetching transactions:', error);
         // Se der erro, deixa vazio
         setRecentTransactions([]);
-      } finally {
-        setLoading(false);
       }
     };
 
