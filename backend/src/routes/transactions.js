@@ -59,6 +59,16 @@ router.post('/analyze', optionalAuth, [
     // Cache the analysis
     await cache.set(cacheKey, analysis, 3600); // 1 hour
 
+    logger.info('🔄 Attempting to save transaction to database...', {
+      userId: userId || 'NULL',
+      type: transactionData.type,
+      from: transactionData.from,
+      to: transactionData.to,
+      amount: transactionData.amount,
+      riskScore: analysis.score,
+      riskLevel: analysis.level,
+    });
+
     // SEMPRE salva no banco (mesmo sem autenticação)
     // Se não tiver userId, salva como NULL (transação anônima)
     const [transaction] = await db('transactions')
@@ -80,11 +90,12 @@ router.post('/analyze', optionalAuth, [
       })
       .returning('*');
     
-    logger.info('✅ Transaction saved to database', {
+    logger.info('✅ Transaction saved to database SUCCESSFULLY!', {
       transactionId: transaction.id,
       userId: userId || 'anonymous',
       riskLevel: analysis.level,
       riskScore: analysis.score,
+      dbRow: transaction,
     });
 
     res.json({

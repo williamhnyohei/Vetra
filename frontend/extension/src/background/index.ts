@@ -158,6 +158,39 @@ async function handleTransactionAnalysis(payload: any) {
     let blockReason = '';
     let requiresApproval = false;
     
+    // SEMPRE armazena transação para mostrar alerta (independente do risco)
+    console.log(`📊 Transaction Risk: ${riskLevel.toUpperCase()} (${analysisResponse.analysis.score}/100)`);
+    
+    // Store transaction data for popup to access (ALWAYS, not just high risk)
+    await chrome.storage.local.set({
+      pendingTransaction: {
+        id: `tx_${Date.now()}`,
+        riskScore: analysisResponse.analysis.score,
+        riskLevel: analysisResponse.analysis.level,
+        reasons: analysisResponse.analysis.reasons,
+        recommendations: analysisResponse.analysis.recommendations,
+        parsedTx,
+        timestamp: Date.now(),
+        heuristics: analysisResponse.analysis.heuristics || {},
+        evidence: analysisResponse.analysis.level === 'high' ? [
+          {
+            source: 'solscan.io',
+            url: `https://solscan.io/account/${parsedTx.toAddress}`,
+            confidence: 92,
+            description: 'This address has been reported in multiple suspicious transactions in the last 30 days.'
+          },
+          {
+            source: 'scam-alert.solana',
+            url: 'https://github.com/solana-labs/scam-alert',
+            confidence: 73,
+            description: 'ALERT: New scam identified using this address. Avoid transactions!'
+          }
+        ] : [],
+      }
+    });
+    
+    console.log('💾 Transaction stored in chrome.storage for popup display');
+    
     // Handle high risk transactions
     if (isHighRisk) {
       console.log('⚠️ HIGH RISK transaction detected!');
@@ -177,34 +210,6 @@ async function handleTransactionAnalysis(payload: any) {
           // Open popup for user approval
           await chrome.action.openPopup();
           
-          // Store transaction data for popup to access
-          await chrome.storage.local.set({
-            pendingTransaction: {
-              id: `tx_${Date.now()}`,
-              riskScore: analysisResponse.analysis.score,
-              riskLevel: analysisResponse.analysis.level,
-              reasons: analysisResponse.analysis.reasons,
-              recommendations: analysisResponse.analysis.recommendations,
-              parsedTx,
-              timestamp: Date.now(),
-              heuristics: analysisResponse.analysis.heuristics || {},
-              evidence: analysisResponse.analysis.level === 'high' ? [
-                {
-                  source: 'solscan.io',
-                  url: `https://solscan.io/account/${parsedTx.toAddress}`,
-                  confidence: 92,
-                  description: 'This address has been reported in multiple suspicious transactions in the last 30 days.'
-                },
-                {
-                  source: 'scam-alert.solana',
-                  url: 'https://github.com/solana-labs/scam-alert',
-                  confidence: 73,
-                  description: 'ALERT: New scam identified using this address. Avoid transactions!'
-                }
-              ] : [],
-            }
-          });
-          
           // Wait for user decision (with timeout)
           const userDecision = await waitForUserApproval(10000); // 10 second timeout
           
@@ -221,7 +226,7 @@ async function handleTransactionAnalysis(payload: any) {
         }
       }
     } else {
-      // Low/Medium risk: always approve
+      // Low/Medium risk: always approve (but still show alert in UI)
       console.log(`✅ ${riskLevel.toUpperCase()} risk - allowing transaction`);
       approved = true;
     }
