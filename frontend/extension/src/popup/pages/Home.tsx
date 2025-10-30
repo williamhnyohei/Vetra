@@ -65,7 +65,7 @@ const Home: React.FC<HomeProps> = ({
       return `${provider}: ${short}`;
     }
     // tenta pegar do i18n; se não tiver, fallback
-    return t('home.connectWallet', language) || 'Connect wallet';
+    return t('Connect Wallet', language) || 'Connect wallet';
   })();
 
   const walletButtonColor = wallet?.address ? '#00D386' : '#FFFFFF';
