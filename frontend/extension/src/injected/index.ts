@@ -24,8 +24,10 @@ function serializeTransaction(transaction: any): any {
     // If transaction has serialize method, use it
     if (transaction && typeof transaction.serialize === 'function') {
       const serialized = transaction.serialize();
+      // Convert to base64 using browser-compatible method
+      const base64 = btoa(String.fromCharCode(...Array.from(serialized)));
       return {
-        serialized: Buffer.from(serialized).toString('base64'),
+        serialized: base64,
         type: 'serialized',
       };
     }

@@ -300,14 +300,26 @@ function reconstructTransaction(transactionData: any): Transaction {
       return transactionData;
     }
     
-    // Try to deserialize if it's serialized
+    // Try to deserialize if it's serialized (using browser-compatible approach)
     if (typeof transactionData === 'string') {
-      return Transaction.from(Buffer.from(transactionData, 'base64'));
+      // Convert base64 to Uint8Array (browser-compatible)
+      const binaryString = atob(transactionData);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return Transaction.from(bytes);
     }
     
     // If it has serialized data
     if (transactionData.serialized) {
-      return Transaction.from(Buffer.from(transactionData.serialized, 'base64'));
+      // Convert base64 to Uint8Array (browser-compatible)
+      const binaryString = atob(transactionData.serialized);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return Transaction.from(bytes);
     }
     
     // If it's a plain object, try to reconstruct
