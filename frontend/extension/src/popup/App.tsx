@@ -6,16 +6,18 @@ import Welcome from './pages/Welcome'; // Import Welcome component
 import TransactionAnalysis from './pages/TransactionAnalysis'; // Import TransactionAnalysis component
 import ConnectWallet from './pages/ConnectWallet'; // Import ConnectWallet component
 import Plans from './pages/Plans'; // Import Plans component
+import TransactionApproval from './pages/TransactionApproval'; // Import TransactionApproval component
 import { useAuthStore } from '../store/auth-store'; // Import auth store
 import { useThemeStore } from '../store/theme-store'; // Import theme store
 
-type Page = 'welcome' | 'home' | 'history' | 'settings' | 'transaction-analysis' | 'connect-wallet' | 'plans';
+type Page = 'welcome' | 'home' | 'history' | 'settings' | 'transaction-analysis' | 'connect-wallet' | 'plans' | 'transaction-approval';
 
 function App() {
   const { isAuthenticated, isLoading, checkAuthStatus } = useAuthStore();
   const { theme, applyTheme } = useThemeStore();
   const [currentPage, setCurrentPage] = useState<Page>('welcome');
   const [selectedTransactionId, setSelectedTransactionId] = useState<string>('');
+  const [hasPendingTransaction, setHasPendingTransaction] = useState(false);
 
   // Apply theme on mount
   useEffect(() => {
@@ -27,12 +29,34 @@ function App() {
     checkAuthStatus();
   }, [checkAuthStatus]);
 
-  // Update current page when auth status changes
+  // Check for pending transactions on mount and periodically
   useEffect(() => {
-    if (!isLoading) {
+    const checkPendingTransaction = () => {
+      chrome.storage.local.get(['pendingTransaction'], (result) => {
+        if (result.pendingTransaction) {
+          setHasPendingTransaction(true);
+          setCurrentPage('transaction-approval');
+        } else {
+          setHasPendingTransaction(false);
+        }
+      });
+    };
+
+    // Check immediately
+    checkPendingTransaction();
+
+    // Check every second in case a transaction comes in
+    const interval = setInterval(checkPendingTransaction, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Update current page when auth status changes (only if no pending transaction)
+  useEffect(() => {
+    if (!isLoading && !hasPendingTransaction) {
       setCurrentPage(isAuthenticated ? 'home' : 'welcome');
     }
-  }, [isAuthenticated, isLoading]);
+  }, [isAuthenticated, isLoading, hasPendingTransaction]);
 
   const renderPage = () => {
     switch (currentPage) {
@@ -73,6 +97,8 @@ function App() {
         return <ConnectWallet onBack={() => setCurrentPage('home')} />;
       case 'plans':
         return <Plans onBack={() => setCurrentPage('home')} />;
+      case 'transaction-approval':
+        return <TransactionApproval />;
       default:
         return <Home 
           onNavigateToAnalysis={() => setCurrentPage('transaction-analysis')} 

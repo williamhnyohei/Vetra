@@ -127,8 +127,29 @@ function wrapSolanaProvider(solanaProvider: any) {
             }
           }
 
-          // For now, always allow - the background script will open popup for high risk
-          // TODO: In future, could block transaction based on user settings
+          // Check if transaction should be blocked
+          if (response.blocked === true) {
+            console.error('🚫 TRANSACTION BLOCKED BY VETRA');
+            console.error('⚠️ Reason:', response.blockReason || 'High risk transaction');
+            
+            // Throw error to prevent transaction from proceeding
+            throw new Error(response.blockReason || '🛡️ Vetra blocked this high-risk transaction for your safety');
+          }
+
+          // If approved or requires manual approval (and user approved), proceed
+          if (response.approved === true) {
+            console.log('✅ Transaction approved by Vetra');
+            return original.apply(target, args);
+          }
+
+          // If rejected by user, block transaction
+          if (response.approved === false) {
+            console.warn('🚫 Transaction rejected by user');
+            throw new Error('🛡️ Transaction rejected by Vetra user');
+          }
+
+          // Default: allow (shouldn't reach here, but safety fallback)
+          console.warn('⚠️ Unexpected response, allowing transaction');
           return original.apply(target, args);
         };
       }
