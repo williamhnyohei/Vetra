@@ -23,6 +23,7 @@ const attestationRoutes = require('./routes/attestations');
 const userRoutes = require('./routes/users');
 const settingsRoutes = require('./routes/settings');
 const healthRoutes = require('./routes/health-simple');
+const masStatusRoutes = require('./routes/mas-status');
 
 // Import middleware
 const { errorHandler } = require('./middleware/errorHandler');
@@ -73,6 +74,9 @@ app.use(morgan('combined', {
 
 // Health check endpoint
 app.use('/api/health', healthRoutes);
+
+// MAS status endpoint (public)
+app.use('/api/mas', masStatusRoutes);
 
 // API routes
 app.use('/api/auth', authRoutes);
