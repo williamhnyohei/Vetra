@@ -101,9 +101,18 @@ router.post('/analyze', optionalAuth, [
 
   } catch (error) {
     logger.error('Transaction analysis error:', error);
+    logger.error('Error stack:', error.stack);
+    logger.error('Error details:', {
+      message: error.message,
+      name: error.name,
+      transactionData: req.body.transactionData,
+    });
+    
     res.status(500).json({
       success: false,
       error: 'Transaction analysis failed',
+      details: error.message,
+      debug: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }
 });
