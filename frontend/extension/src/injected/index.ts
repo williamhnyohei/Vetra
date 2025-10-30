@@ -180,15 +180,31 @@ function wrapSolanaProvider(solanaProvider: any) {
     },
   });
 
-  // Replace window.solana
-  Object.defineProperty(window, 'solana', {
-    value: wrappedSolana,
-    writable: false,
-    configurable: true,
-  });
+  // Try to replace window.solana (may fail if wallet already defined it as non-configurable)
+  try {
+    Object.defineProperty(window, 'solana', {
+      value: wrappedSolana,
+      writable: false,
+      configurable: true,
+    });
+    console.log('✅ window.solana replaced with Vetra wrapper');
+  } catch (error) {
+    // If we can't redefine, wrap the methods in-place
+    console.log('⚠️ Cannot redefine window.solana (wallet set it as non-configurable)');
+    console.log('🔧 Wrapping methods in-place instead...');
+    
+    // Wrap methods directly on the existing object
+    methodsToIntercept.forEach(method => {
+      if (typeof solanaProvider[method] === 'function') {
+        const original = solanaProvider[method];
+        solanaProvider[method] = wrappedSolana[method];
+        console.log(`✅ Wrapped ${method} in-place`);
+      }
+    });
+  }
 
   console.log('✅ window.solana wrapped successfully!');
-  console.log('🔗 New window.solana:', wrappedSolana);
+  console.log('🔗 window.solana:', window.solana);
   console.log('🛡️ Vetra protection active');
   console.log('💼 Wallet:', solanaProvider.isPhantom ? 'Phantom' : solanaProvider.isSolflare ? 'Solflare' : solanaProvider.isBackpack ? 'Backpack' : 'Unknown');
   console.log('🌐 Ready to intercept transactions!');
