@@ -7,6 +7,7 @@ const { Connection, PublicKey } = require('@solana/web3.js');
 const { getAccount } = require('@solana/spl-token');
 const axios = require('axios');
 const logger = require('../utils/logger');
+const { analyzeTransactionWithMAS, getMASStatus } = require('./multiAgentSystemMock');
 
 // Initialize Solana connection
 const connection = new Connection(
@@ -21,6 +22,8 @@ const connection = new Connection(
  */
 async function analyzeTransaction(transactionData) {
   try {
+    logger.info('🔍 Starting risk analysis');
+    
     const {
       signature,
       type,
@@ -30,6 +33,32 @@ async function analyzeTransaction(transactionData) {
       token,
     } = transactionData;
 
+    // Check if we should use Multi-Agent System (MAS)
+    const useMAS = process.env.USE_MULTI_AGENT_SYSTEM === 'true' || true; // Default to true for mock
+
+    if (useMAS) {
+      logger.info('🤖 Using Multi-Agent System for analysis');
+      const masStatus = getMASStatus();
+      logger.info('MAS Status:', masStatus);
+
+      // Use MAS for analysis (currently mock)
+      const masAnalysis = await analyzeTransactionWithMAS(transactionData);
+      
+      return {
+        score: masAnalysis.score,
+        level: masAnalysis.level,
+        reasons: masAnalysis.reasons,
+        heuristics: masAnalysis.heuristics,
+        recommendations: masAnalysis.recommendations,
+        confidence: masAnalysis.confidence,
+        method: 'multi-agent-system',
+        isMock: masAnalysis.isMock,
+        agentAnalysis: masAnalysis.agentAnalysis,
+      };
+    }
+
+    // Fallback to traditional heuristic analysis
+    logger.info('📊 Using traditional heuristic analysis');
     const riskFactors = [];
     let riskScore = 0;
 

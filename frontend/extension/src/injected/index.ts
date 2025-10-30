@@ -70,8 +70,10 @@ function wrapSolanaProvider(solanaProvider: any) {
       // Intercept transaction signing/sending methods
       if (methodsToIntercept.includes(String(prop))) {
         return async function (...args: any[]) {
-          console.log(`🎯 INTERCEPTED ${String(prop)}!!!`);
+          console.log(`🎯 VETRA INTERCEPTED ${String(prop)}!!!`);
+          console.log('=' .repeat(50));
           console.log('📦 Arguments:', args);
+          console.log('🕐 Timestamp:', new Date().toISOString());
 
           // Determine transaction from arguments based on method
           let transactionData = null;
@@ -187,7 +189,9 @@ function wrapSolanaProvider(solanaProvider: any) {
 
   console.log('✅ window.solana wrapped successfully!');
   console.log('🔗 New window.solana:', wrappedSolana);
-  console.log('🛡️ Vetra protection active on Solana Mainnet');
+  console.log('🛡️ Vetra protection active');
+  console.log('💼 Wallet:', solanaProvider.isPhantom ? 'Phantom' : solanaProvider.isSolflare ? 'Solflare' : solanaProvider.isBackpack ? 'Backpack' : 'Unknown');
+  console.log('🌐 Ready to intercept transactions!');
   
   return wrappedSolana;
 }
