@@ -76,26 +76,55 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
   
-  loginAsGuest: () => {
-    set({
-      isAuthenticated: true,
-      user: {
-        id: 'guest-user-id',
-        email: 'guest@vetra.com',
-        name: 'Guest User',
-        provider: 'guest'
-      }
-    });
+  loginAsGuest: async () => {
+    set({ isLoading: true, error: null });
     
-    // Store guest auth data in localStorage
-    localStorage.setItem('vetra-auth', JSON.stringify({
-      provider: 'guest',
-      user: {
-        id: 'guest-user-id',
-        email: 'guest@vetra.com',
-        name: 'Guest User'
+    try {
+      const authService = AuthService.getInstance();
+      const success = await authService.signInAsGuest();
+      
+      if (success) {
+        const authState = authService.getAuthState();
+        const user = authState.user;
+        
+        if (user) {
+          // Configura o token no ApiService (guest também tem token JWT!)
+          if (authState.token) {
+            const apiService = ApiService.getInstance();
+            apiService.setAuthToken(authState.token);
+            console.log('✅ Guest token set in API service');
+          }
+          
+          set({
+            isAuthenticated: true,
+            isLoading: false,
+            user: {
+              id: user.id,
+              email: user.email,
+              name: user.name || 'Guest User',
+              avatar: undefined,
+              provider: 'guest',
+              token: authState.token || undefined
+            },
+            error: null
+          });
+          
+          console.log('✅ Logged in as Guest:', user.id);
+        } else {
+          throw new Error('No user data received for guest');
+        }
+      } else {
+        throw new Error('Guest authentication failed');
       }
-    }));
+      
+    } catch (error: any) {
+      console.error('Guest login error:', error);
+      set({
+        isAuthenticated: false,
+        isLoading: false,
+        error: error.message || 'Failed to login as guest'
+      });
+    }
   },
   
   logout: async () => {

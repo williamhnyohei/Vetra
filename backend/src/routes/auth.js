@@ -106,7 +106,7 @@ router.post('/google/extension', [
       });
     }
 
-    const { token, userInfo } = req.body;
+    const { token, userInfo, guestUserId } = req.body;
 
     // Validate token with Google
     let googleUser;
@@ -168,6 +168,30 @@ router.post('/google/extension', [
         userId: dbUser.id,
         email: dbUser.email,
       });
+    }
+
+    // Migrate transactions from guest user if provided
+    if (guestUserId) {
+      try {
+        // Migrate all transactions from guest to Google user
+        const migratedCount = await db('transactions')
+          .where({ user_id: guestUserId })
+          .update({ user_id: dbUser.id });
+        
+        logger.info('✅ Migrated transactions from guest to Google user', {
+          guestUserId,
+          googleUserId: dbUser.id,
+          transactionCount: migratedCount,
+        });
+        
+        // Delete guest user
+        await db('users').where({ id: guestUserId }).delete();
+        
+        logger.info('✅ Guest user deleted after migration', { guestUserId });
+      } catch (migrationError) {
+        logger.error('❌ Error migrating guest transactions:', migrationError);
+        // Continue anyway - don't fail the login
+      }
     }
 
     // Generate JWT tokens
