@@ -10,7 +10,7 @@ const { body, validationResult } = require('express-validator');
 const { db } = require('../config/database');
 const { cache } = require('../config/redis');
 const logger = require('../utils/logger');
-const { DEFAULT_PREFERENCES, DEFAULT_SETTINGS } = require('../config/defaults');
+const { DEFAULT_SETTINGS } = require('../config/defaults');
 
 const router = express.Router();
 
@@ -40,7 +40,6 @@ router.get('/google/callback',
             provider: 'google',
             provider_id: user.id,
             is_verified: true,
-            preferences: DEFAULT_PREFERENCES,
             settings: DEFAULT_SETTINGS,
             last_login_at: new Date(),
           })
@@ -147,7 +146,6 @@ router.post('/google/extension', [
           provider_id: googleUser.id,
           is_verified: true,
           is_active: true,
-          preferences: DEFAULT_PREFERENCES,
           settings: DEFAULT_SETTINGS,
           last_login_at: new Date(),
         })
@@ -235,7 +233,6 @@ router.post('/guest', [
         name,
         provider: 'guest',
         is_active: true,
-        preferences: DEFAULT_PREFERENCES,
         settings: DEFAULT_SETTINGS,
         last_login_at: new Date(),
       })
@@ -388,7 +385,6 @@ router.get('/me', async (req, res) => {
         avatar: user.avatar_url,
         provider: user.provider,
         subscription_plan: user.subscription_plan,
-        preferences: user.preferences,
         settings: user.settings,
         created_at: user.created_at,
         last_login_at: user.last_login_at,

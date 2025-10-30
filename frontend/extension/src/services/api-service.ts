@@ -266,6 +266,24 @@ class ApiService {
   }> {
     return this.request('/health');
   }
+
+  /**
+   * Upgrade to Pro plan
+   */
+  public async upgradeToPro(): Promise<{
+    success: boolean;
+    message: string;
+    user: {
+      id: string;
+      email: string;
+      subscription_plan: string;
+      subscription_expires_at: string;
+    };
+  }> {
+    return this.request('/users/upgrade-to-pro', {
+      method: 'POST',
+    });
+  }
 }
 
 export default ApiService;

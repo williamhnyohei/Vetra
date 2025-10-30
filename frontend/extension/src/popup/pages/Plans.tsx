@@ -1,10 +1,37 @@
-import React from 'react';
+import React, { useState } from 'react';
+import ApiService from '../../services/api-service';
 
 interface PlansProps {
   onBack?: () => void;
 }
 
 const Plans: React.FC<PlansProps> = ({ onBack }) => {
+  const [isUpgrading, setIsUpgrading] = useState(false);
+  const [upgradeSuccess, setUpgradeSuccess] = useState(false);
+
+  const handleUpgrade = async () => {
+    try {
+      setIsUpgrading(true);
+      const apiService = ApiService.getInstance();
+      const response = await apiService.upgradeToPro();
+      
+      if (response.success) {
+        setUpgradeSuccess(true);
+        console.log('✅ Upgraded to Pro:', response);
+        
+        // Show success message for 2 seconds then go back
+        setTimeout(() => {
+          if (onBack) onBack();
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('❌ Upgrade error:', error);
+      alert('Failed to upgrade. Please try again.');
+    } finally {
+      setIsUpgrading(false);
+    }
+  };
+
   return (
     <div className="w-full h-full bg-dark-bg text-dark-text p-4 space-y-6 overflow-y-auto">
       {/* Header */}
@@ -389,16 +416,19 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
         <button 
           className="w-full rounded-lg py-3 mb-3"
           style={{
-            backgroundColor: '#FBB500',
+            backgroundColor: upgradeSuccess ? '#00D386' : '#FBB500',
             color: '#1A141F',
             fontFamily: 'Arial',
             fontWeight: '700',
             fontSize: '14px',
             lineHeight: '20px',
-            letterSpacing: '0px'
+            letterSpacing: '0px',
+            opacity: isUpgrading ? 0.7 : 1
           }}
+          onClick={handleUpgrade}
+          disabled={isUpgrading || upgradeSuccess}
         >
-          Upgrade to Pro
+          {upgradeSuccess ? '✅ Upgraded!' : isUpgrading ? 'Upgrading...' : 'Upgrade to Pro'}
         </button>
         
         <p 
