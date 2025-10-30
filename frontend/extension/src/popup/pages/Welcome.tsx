@@ -12,38 +12,39 @@ const Welcome: React.FC<WelcomeProps> = ({ onGoogleLogin, onContinueAsGuest }) =
   const { isLoading, error, clearError } = useAuthStore();
   const { language } = useLanguageStore();
 
-  // Clear error when component mounts
+  // limpa erros antigos ao montar a tela
   React.useEffect(() => {
-    if (error) {
-      clearError();
-    }
-  }, [error, clearError]);
+    clearError();
+  }, [clearError]);
+
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center p-8" style={{ backgroundColor: '#121212', borderRadius: '14px' }}>
+    <div
+      className="w-full h-full flex flex-col items-center justify-center p-8"
+      style={{ backgroundColor: '#121212', borderRadius: '14px' }}
+    >
       {/* Logo Vetra */}
       <div className="mb-8">
         <div className="w-16 h-16 flex items-center justify-center">
-          {/* Logo oficial do Vetra - carregando do asset */}
-          <img 
-            src="/assets/logo.svg" 
-            alt="Vetra Logo" 
+          <img
+            src="/assets/logo.svg"
+            alt="Vetra Logo"
             className="w-16 h-16"
             style={{ maxWidth: '64px', maxHeight: '64px' }}
           />
         </div>
       </div>
 
-      {/* Título de Boas-vindas */}
-      <h1 className="title-welcome mb-4" style={{ color: '#E6E6E6' }}>
+      {/* Título */}
+      <h1 className="mb-4" style={{ color: '#E6E6E6', fontSize: 20, fontWeight: 700 }}>
         {t('welcome.title', language)}
       </h1>
 
-      {/* Descrição */}
-      <p className="subtitle-welcome mb-12" style={{ color: '#9CA3AF' }}>
+      {/* Subtítulo */}
+      <p className="mb-12" style={{ color: '#9CA3AF', textAlign: 'center', fontSize: 14 }}>
         {t('welcome.subtitle', language)}
       </p>
 
-      {/* Botão Entrar com Google */}
+      {/* Botão Google */}
       <button
         onClick={onGoogleLogin}
         disabled={isLoading}
@@ -54,21 +55,19 @@ const Welcome: React.FC<WelcomeProps> = ({ onGoogleLogin, onContinueAsGuest }) =
           fontFamily: 'Arial, sans-serif',
           fontSize: '16px',
           lineHeight: '20px',
-          letterSpacing: '0px',
-          fontWeight: '400'
         }}
       >
         {isLoading ? (
           <div className="flex items-center gap-2">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-            Signing in...
+            {t('welcome.loading', language) || 'Signing in...'}
           </div>
         ) : (
           t('welcome.googleButton', language)
         )}
       </button>
 
-      {/* Botão Continuar como Visitante */}
+      {/* Botão Guest */}
       <button
         onClick={onContinueAsGuest}
         disabled={isLoading}
@@ -79,24 +78,20 @@ const Welcome: React.FC<WelcomeProps> = ({ onGoogleLogin, onContinueAsGuest }) =
           fontFamily: 'Arial, sans-serif',
           fontSize: '16px',
           lineHeight: '20px',
-          letterSpacing: '0px',
-          fontWeight: '400'
         }}
       >
         {t('welcome.guestButton', language)}
       </button>
 
-      {/* Error Message */}
+      {/* Erro */}
       {error && (
         <div className="w-full max-w-xs mb-4 p-3 bg-red-900/20 border border-red-500/30 rounded-lg">
-          <p className="text-red-400 text-sm text-center">
-            {error}
-          </p>
+          <p className="text-red-400 text-sm text-center">{error}</p>
         </div>
       )}
 
       {/* Disclaimer */}
-      <p className="description-welcome max-w-xs" style={{ color: '#9CA3AF' }}>
+      <p className="max-w-xs text-center" style={{ color: '#9CA3AF', fontSize: 12, lineHeight: '18px' }}>
         {t('welcome.disclaimer', language)}
       </p>
     </div>
