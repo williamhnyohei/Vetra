@@ -364,12 +364,11 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                 className={`w-12 h-6 rounded-full transition-colors ${
                   soundAlerts ? 'bg-yellow-500' : 'bg-gray-600'
                 }`}
-                onClick={async () => {
+                onClick={() => {
                   const newValue = !soundAlerts;
                   setSoundAlerts(newValue);
-                  await saveSettingToBackend('soundAlerts', newValue);
+                  saveSettingToBackend('soundAlerts', newValue);
                 }}
-                disabled={isSavingSettings}
               >
                 <div
                   className={`w-5 h-5 bg-white rounded-full transition-transform ${
@@ -636,12 +635,11 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
               className={`w-12 h-6 rounded-full transition-colors ${
                 shareInsights ? 'bg-yellow-500' : 'bg-gray-600'
               }`}
-              onClick={async () => {
+              onClick={() => {
                 const newValue = !shareInsights;
                 setShareInsights(newValue);
-                await saveSettingToBackend('shareInsights', newValue);
+                saveSettingToBackend('shareInsights', newValue);
               }}
-              disabled={isSavingSettings}
             >
               <div
                 className={`w-5 h-5 bg-white rounded-full transition-transform ${
@@ -697,12 +695,11 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
               className={`w-12 h-6 rounded-full transition-colors ${
                 transactionMemory ? 'bg-yellow-500' : 'bg-gray-600'
               }`}
-              onClick={async () => {
+              onClick={() => {
                 const newValue = !transactionMemory;
                 setTransactionMemory(newValue);
-                await saveSettingToBackend('transactionMemory', newValue);
+                saveSettingToBackend('transactionMemory', newValue);
               }}
-              disabled={isSavingSettings}
             >
               <div
                 className={`w-5 h-5 bg-white rounded-full transition-transform ${
@@ -744,12 +741,11 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
               className={`w-12 h-6 rounded-full transition-colors ${
                 smartContractFingerprints ? 'bg-yellow-500' : 'bg-gray-600'
               }`}
-              onClick={async () => {
+              onClick={() => {
                 const newValue = !smartContractFingerprints;
                 setSmartContractFingerprints(newValue);
-                await saveSettingToBackend('smartContractFingerprints', newValue);
+                saveSettingToBackend('smartContractFingerprints', newValue);
               }}
-              disabled={isSavingSettings}
             >
               <div
                 className={`w-5 h-5 bg-white rounded-full transition-transform ${
