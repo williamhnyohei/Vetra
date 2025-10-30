@@ -14,10 +14,9 @@ interface HomeProps {
   onNavigateToTransactionApproval?: () => void;
 }
 
-const Home: React.FC<HomeProps> = ({ onNavigateToAnalysis, onNavigateToConnectWallet, onNavigateToPlans, onNavigateToSettings, onNavigateToHistory, onNavigateToTransaction, onNavigateToTransactionApproval }) => {
+const Home: React.FC<HomeProps> = ({ onNavigateToConnectWallet, onNavigateToPlans, onNavigateToSettings, onNavigateToHistory, onNavigateToTransaction, onNavigateToTransactionApproval }) => {
   const { language } = useLanguageStore();
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
   const [pendingTransaction, setPendingTransaction] = useState<any>(null);
 
   // Verifica transações pendentes (interceptadas)
@@ -82,17 +81,6 @@ const Home: React.FC<HomeProps> = ({ onNavigateToAnalysis, onNavigateToConnectWa
   
   return (
     <div className="w-full h-full bg-dark-bg text-dark-text p-4 space-y-4 overflow-y-auto relative">
-      {/* Transaction Alert (shows when transaction is intercepted) */}
-      {pendingTransaction && (
-        <TransactionAlert
-          riskLevel={pendingTransaction.riskLevel}
-          amount={pendingTransaction.parsedTx?.amount || '0'}
-          token={pendingTransaction.parsedTx?.tokenSymbol || 'SOL'}
-          onViewAnalysis={handleViewAnalysis}
-          onBlock={handleBlockTransaction}
-        />
-      )}
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -182,95 +170,16 @@ const Home: React.FC<HomeProps> = ({ onNavigateToAnalysis, onNavigateToConnectWa
           </button>
         </div>
       </div>
-      {/* Alerta de transação pendente - só aparece quando houver transação real */}
-      {recentTransactions.length > 0 && recentTransactions[0].status === 'pending' && recentTransactions[0].risk_level === 'high' && (
-        <div className="bg-dark-card rounded-lg p-4 border border-yellow-500/20">
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0">
-              <img
-                src="/assets/icon-warning.svg"
-                alt="Warning"
-                className="w-6 h-6"
-              />
-            </div>
-            <div className="flex-1">
-              <h3 
-                style={{
-                  fontFamily: 'Arial',
-                  fontWeight: '400',
-                  fontSize: '14px',
-                  lineHeight: '20px',
-                  letterSpacing: '0px',
-                  color: '#E6E6E6',
-                  marginBottom: '4px'
-                }}
-              >
-                {t('home.highRiskDetected', language)}
-              </h3>
-              <p 
-                style={{
-                  fontFamily: 'Arial',
-                  fontWeight: '400',
-                  fontSize: '14px',
-                  lineHeight: '20px',
-                  letterSpacing: '0px',
-                  color: '#858C94',
-                  marginBottom: '16px'
-                }}
-              >
-                {recentTransactions[0].amount ? `${(parseFloat(recentTransactions[0].amount) / 1e9).toFixed(4)} SOL` : recentTransactions[0].type}
-              </p>
-            </div>
-          </div>
-          
-          <div className="flex gap-3" style={{ marginLeft: '0' }}>
-                <button 
-                  className="flex-1 rounded-lg flex items-center justify-center gap-2 transition-colors"
-                  style={{
-                    backgroundColor: '#FBB500',
-                    color: '#1A141F',
-                    fontFamily: 'Arial',
-                    fontWeight: '700',
-                    fontSize: '14px',
-                    lineHeight: '20px',
-                    letterSpacing: '0px',
-                    height: '3rem',
-                    paddingLeft: '16px',
-                    paddingRight: '16px'
-                  }}
-                  onClick={() => onNavigateToTransaction?.(recentTransactions[0].id)}
-                >
-              <img
-                src="/assets/icon-analysis.svg"
-                alt="Analysis"
-                className="w-5 h-5"
-              />
-              {t('home.viewAnalysis', language)}
-            </button>
-            <button 
-              className="flex-1 rounded-lg flex items-center justify-center gap-2 transition-colors"
-              style={{
-                backgroundColor: '#DA291C',
-                color: '#FFFFFF',
-                fontFamily: 'Arial',
-                fontWeight: '400',
-                fontSize: '14px',
-                lineHeight: '20px',
-                letterSpacing: '0px',
-                height: '3rem',
-                paddingLeft: '16px',
-                paddingRight: '16px'
-              }}
-            >
-              <img
-                src="/assets/icon-blocked.svg"
-                alt="Block"
-                className="w-5 h-5"
-              />
-              {t('home.block', language)}
-            </button>
-          </div>
-        </div>
+
+      {/* Transaction Alert (shows when transaction is intercepted) */}
+      {pendingTransaction && (
+        <TransactionAlert
+          riskLevel={pendingTransaction.riskLevel}
+          amount={pendingTransaction.parsedTx?.amount || '0'}
+          token={pendingTransaction.parsedTx?.tokenSymbol || 'SOL'}
+          onViewAnalysis={handleViewAnalysis}
+          onBlock={handleBlockTransaction}
+        />
       )}
 
       {/* Recent Activity */}
@@ -289,11 +198,7 @@ const Home: React.FC<HomeProps> = ({ onNavigateToAnalysis, onNavigateToConnectWa
           {t('home.recentActivity', language)}
         </h2>
         <div className="space-y-3">
-          {loading ? (
-            <div className="text-center py-8 text-gray-400">
-              Carregando...
-            </div>
-          ) : recentTransactions.length === 0 ? (
+          {recentTransactions.length === 0 ? (
             <div className="text-center py-8">
               <p style={{ color: '#858C94', fontSize: '14px' }}>
                 Nenhuma transação ainda

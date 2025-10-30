@@ -8,13 +8,13 @@ const { body, query, validationResult } = require('express-validator');
 const { db } = require('../config/database');
 const { cache } = require('../config/redis');
 const { analyzeTransactionWithMultiAgent } = require('../services/multiAgentRiskAnalyzer');
-const { optionalAuth } = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
 const logger = require('../utils/logger');
 
 const router = express.Router();
 
 // Analyze transaction
-router.post('/analyze', optionalAuth, [
+router.post('/analyze', authenticateToken, [
   body('transactionData').isObject().notEmpty(),
   body('transactionData.signature').optional().isString(),
   body('transactionData.type').isString().notEmpty(),
@@ -34,7 +34,7 @@ router.post('/analyze', optionalAuth, [
     }
 
     const { transactionData } = req.body;
-    const userId = req.user ? req.user.userId : null;
+    const { userId } = req.user;
 
     // Check cache first
     const cacheKey = `analysis:${transactionData.signature || transactionData.from + transactionData.to + transactionData.amount}`;
@@ -60,7 +60,7 @@ router.post('/analyze', optionalAuth, [
     await cache.set(cacheKey, analysis, 3600); // 1 hour
 
     logger.info('🔄 Attempting to save transaction to database...', {
-      userId: userId || 'NULL',
+      userId,
       type: transactionData.type,
       from: transactionData.from,
       to: transactionData.to,
@@ -69,11 +69,10 @@ router.post('/analyze', optionalAuth, [
       riskLevel: analysis.level,
     });
 
-    // SEMPRE salva no banco (mesmo sem autenticação)
-    // Se não tiver userId, salva como NULL (transação anônima)
+    // Save transaction to database
     const [transaction] = await db('transactions')
       .insert({
-        user_id: userId || null, // Permite NULL para usuários não autenticados
+        user_id: userId,
         signature: transactionData.signature,
         transaction_hash: transactionData.signature,
         type: transactionData.type,
@@ -83,8 +82,8 @@ router.post('/analyze', optionalAuth, [
         token_address: transactionData.token,
         risk_score: analysis.score,
         risk_level: analysis.level,
-        risk_reasons: JSON.stringify(analysis.reasons || []), // Ensure valid JSON string
-        heuristics: JSON.stringify(analysis.heuristics || {}), // Ensure valid JSON string
+        risk_reasons: JSON.stringify(analysis.reasons || []),
+        heuristics: JSON.stringify(analysis.heuristics || {}),
         status: 'pending',
         analyzed_at: new Date(),
       })
@@ -92,7 +91,7 @@ router.post('/analyze', optionalAuth, [
     
     logger.info('✅ Transaction saved to database SUCCESSFULLY!', {
       transactionId: transaction.id,
-      userId: userId || 'anonymous',
+      userId,
       riskLevel: analysis.level,
       riskScore: analysis.score,
       dbRow: transaction,
@@ -101,13 +100,12 @@ router.post('/analyze', optionalAuth, [
     res.json({
       success: true,
       analysis,
-      transaction: transaction ? {
+      transaction: {
         id: transaction.id,
         risk_score: transaction.risk_score,
         risk_level: transaction.risk_level,
         status: transaction.status,
-      } : null,
-      authenticated: !!userId,
+      },
     });
 
   } catch (error) {
@@ -129,7 +127,7 @@ router.post('/analyze', optionalAuth, [
 });
 
 // Get transaction history
-router.get('/history', [
+router.get('/history', authenticateToken, [
   query('page').optional().isInt({ min: 1 }).toInt(),
   query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
   query('status').optional().isIn(['pending', 'approved', 'rejected', 'completed']),
@@ -156,8 +154,7 @@ router.get('/history', [
     const offset = (page - 1) * limit;
 
     // Build query
-    let query = db('transactions')
-      .where({ user_id: userId });
+    let query = db('transactions').where({ user_id: userId });
 
     if (status) {
       query = query.where({ status });
@@ -196,14 +193,12 @@ router.get('/history', [
 
     res.json({
       success: true,
-      data: {
-        transactions,
-        pagination: {
-          page,
-          limit,
-          total: parseInt(count),
-          pages: Math.ceil(count / limit),
-        },
+      transactions,
+      pagination: {
+        page,
+        limit,
+        total: parseInt(count),
+        pages: Math.ceil(count / limit),
       },
     });
 
@@ -217,7 +212,7 @@ router.get('/history', [
 });
 
 // Get transaction by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { userId } = req.user;
@@ -248,7 +243,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Update transaction status
-router.patch('/:id/status', [
+router.patch('/:id/status', authenticateToken, [
   body('status').isIn(['approved', 'rejected']),
   body('feedback').optional().isString().trim().isLength({ max: 500 }),
 ], async (req, res) => {
@@ -298,7 +293,7 @@ router.patch('/:id/status', [
 });
 
 // Get risk statistics
-router.get('/stats/risk', async (req, res) => {
+router.get('/stats/risk', authenticateToken, async (req, res) => {
   try {
     const { userId } = req.user;
 
