@@ -129,7 +129,6 @@ router.get('/settings', async (req, res) => {
     res.json({
       success: true,
       settings: user.settings || {},
-      preferences: user.preferences || {},
     });
 
   } catch (error) {
@@ -144,7 +143,6 @@ router.get('/settings', async (req, res) => {
 // Update user settings
 router.patch('/settings', [
   body('settings').optional().isObject(),
-  body('preferences').optional().isObject(),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -157,11 +155,10 @@ router.patch('/settings', [
     }
 
     const { userId } = req.user;
-    const { settings, preferences } = req.body;
+    const { settings } = req.body;
 
     const updateData = {};
     if (settings) updateData.settings = settings;
-    if (preferences) updateData.preferences = preferences;
 
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({
@@ -180,7 +177,6 @@ router.patch('/settings', [
     res.json({
       success: true,
       settings: updatedUser.settings,
-      preferences: updatedUser.preferences,
     });
 
   } catch (error) {

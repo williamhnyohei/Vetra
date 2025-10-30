@@ -1,11 +1,28 @@
--- Manual script to populate default preferences and settings
+-- Manual script to consolidate preferences into settings
 -- Run this directly in Railway's PostgreSQL console
 
+-- Step 1: Check current state
+SELECT 
+  id,
+  email,
+  settings
+FROM users
+LIMIT 5;
+
+-- Step 2: Merge preferences into settings (consolidates everything)
 UPDATE users
-SET 
-  preferences = '{
+SET settings = settings || preferences,
+    updated_at = CURRENT_TIMESTAMP
+WHERE preferences IS NOT NULL 
+  AND preferences != '{}'::jsonb;
+
+-- Step 3: Populate default settings for empty settings
+UPDATE users
+SET
+  settings = '{
     "language": "en",
     "theme": "dark",
+    "soundAlerts": true,
     "notifications": {
       "email": true,
       "push": true,
@@ -13,29 +30,33 @@ SET
       "attestation_updates": true
     },
     "ai_language": "en",
-    "share_insights": false
-  }'::jsonb,
-  settings = '{
+    "aiLanguage": "en",
+    "ai_rigidity": 50,
+    "aiRigidity": 50,
+    "share_insights": false,
+    "shareInsights": false,
     "risk_threshold": 50,
     "auto_block_high_risk": false,
     "show_attestations": true,
     "network": "mainnet-beta",
     "rpc_endpoint": "https://api.mainnet-beta.solana.com",
-    "ai_rigidity": 50,
     "transaction_memory": true,
-    "smart_contract_fingerprints": true
+    "transactionMemory": true,
+    "smart_contract_fingerprints": true,
+    "smartContractFingerprints": true
   }'::jsonb,
   updated_at = CURRENT_TIMESTAMP
-WHERE 
-  (preferences = '{}'::jsonb OR preferences IS NULL)
-  OR (settings = '{}'::jsonb OR settings IS NULL);
+WHERE settings = '{}'::jsonb OR settings IS NULL;
 
--- Verify the update
+-- Step 4: Drop preferences column
+ALTER TABLE users DROP COLUMN IF EXISTS preferences;
+
+-- Step 5: Verify the update
 SELECT 
   id,
   email,
-  preferences,
-  settings
+  settings,
+  updated_at
 FROM users
-LIMIT 5;
-
+ORDER BY updated_at DESC
+LIMIT 10;
