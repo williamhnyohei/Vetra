@@ -291,4 +291,51 @@ router.delete('/account', [
   }
 });
 
+// Upgrade to Pro plan
+router.post('/upgrade-to-pro', async (req, res) => {
+  try {
+    const { userId } = req.user;
+
+    // Update user subscription to Pro
+    const [updatedUser] = await db('users')
+      .where({ id: userId })
+      .update({
+        subscription_plan: 'pro',
+        subscription_expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
+        updated_at: new Date(),
+      })
+      .returning('*');
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
+
+    logger.info('User upgraded to Pro', {
+      userId: updatedUser.id,
+      email: updatedUser.email,
+    });
+
+    res.json({
+      success: true,
+      message: 'Successfully upgraded to Pro',
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        subscription_plan: updatedUser.subscription_plan,
+        subscription_expires_at: updatedUser.subscription_expires_at,
+      },
+    });
+
+  } catch (error) {
+    logger.error('Upgrade to Pro error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to upgrade to Pro',
+    });
+  }
+});
+
 module.exports = router;
