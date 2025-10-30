@@ -1,7 +1,22 @@
 // Injected Script - Runs in page context, has access to window.solana
 console.log('🟣 Vetra injected script loaded');
 console.log('🔍 Checking for window.solana...');
-console.log('🌐 Network: Solana Mainnet');
+
+// Detect network (will be determined from wallet connection)
+let currentNetwork = 'unknown';
+
+// Try to detect network from URL or other indicators
+if (window.location.hostname.includes('devnet') || window.location.search.includes('devnet')) {
+  currentNetwork = 'devnet';
+  console.log('🌐 Network: Solana Devnet (Testing Environment)');
+  console.log('💡 Using fake SOL - test safely!');
+} else if (window.location.hostname.includes('testnet') || window.location.search.includes('testnet')) {
+  currentNetwork = 'testnet';
+  console.log('🌐 Network: Solana Testnet');
+} else {
+  currentNetwork = 'mainnet';
+  console.log('🌐 Network: Solana Mainnet');
+}
 
 // Serialize transaction to safely pass through messages
 function serializeTransaction(transaction: any): any {
@@ -89,6 +104,7 @@ function wrapSolanaProvider(solanaProvider: any) {
                 transaction: serializedTx,
                 url: window.location.href,
                 timestamp: Date.now(),
+                network: currentNetwork,
               },
             },
             '*'
@@ -127,8 +143,29 @@ function wrapSolanaProvider(solanaProvider: any) {
             }
           }
 
-          // For now, always allow - the background script will open popup for high risk
-          // TODO: In future, could block transaction based on user settings
+          // Check if transaction should be blocked
+          if (response.blocked === true) {
+            console.error('🚫 TRANSACTION BLOCKED BY VETRA');
+            console.error('⚠️ Reason:', response.blockReason || 'High risk transaction');
+            
+            // Throw error to prevent transaction from proceeding
+            throw new Error(response.blockReason || '🛡️ Vetra blocked this high-risk transaction for your safety');
+          }
+
+          // If approved or requires manual approval (and user approved), proceed
+          if (response.approved === true) {
+            console.log('✅ Transaction approved by Vetra');
+            return original.apply(target, args);
+          }
+
+          // If rejected by user, block transaction
+          if (response.approved === false) {
+            console.warn('🚫 Transaction rejected by user');
+            throw new Error('🛡️ Transaction rejected by Vetra user');
+          }
+
+          // Default: allow (shouldn't reach here, but safety fallback)
+          console.warn('⚠️ Unexpected response, allowing transaction');
           return original.apply(target, args);
         };
       }

@@ -7,8 +7,8 @@ import AuthService from '../services/auth-service';
 
 // Background Service Worker for MV3
 console.log('🛡️ Vetra background service worker initialized');
-console.log('🌐 Network: Solana Mainnet');
 console.log('🔒 Transaction interception: ACTIVE');
+console.log('🌐 Supports: Mainnet, Devnet, Testnet');
 
 // Initialize services
 const apiService = ApiService.getInstance();
@@ -67,14 +67,47 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 /**
+ * Wait for user approval decision
+ */
+function waitForUserApproval(timeoutMs: number): Promise<{ approved: boolean }> {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      console.warn('⏰ User approval timeout - defaulting to ALLOW');
+      resolve({ approved: true });
+    }, timeoutMs);
+
+    // Listen for approval decision from popup
+    const listener = (message: any) => {
+      if (message.type === 'TRANSACTION_DECISION') {
+        clearTimeout(timeout);
+        chrome.runtime.onMessage.removeListener(listener);
+        console.log('✅ User decision received:', message.approved ? 'APPROVED' : 'REJECTED');
+        resolve({ approved: message.approved });
+      }
+    };
+
+    chrome.runtime.onMessage.addListener(listener);
+  });
+}
+
+/**
  * Handle transaction analysis
  */
 async function handleTransactionAnalysis(payload: any) {
   try {
-    console.log('🔍 Analyzing transaction on Solana Mainnet');
+    const network = payload.network || 'mainnet';
+    const networkEmoji = network === 'devnet' ? '🧪' : network === 'testnet' ? '🔧' : '🌐';
+    const networkName = network === 'devnet' ? 'Devnet (Testing)' : network === 'testnet' ? 'Testnet' : 'Mainnet';
+    
+    console.log(`🔍 Analyzing transaction on Solana ${networkName}`);
+    console.log(`${networkEmoji} Network:`, network.toUpperCase());
     console.log('🌐 Origin URL:', payload.url);
     console.log('🔧 Method:', payload.method);
     console.log('⏰ Timestamp:', new Date(payload.timestamp).toISOString());
+    
+    if (network === 'devnet') {
+      console.log('💡 Devnet detected - using test SOL (no real money)');
+    }
     
     // Parse the transaction from the payload
     const transaction = reconstructTransaction(payload.transaction);
@@ -110,6 +143,74 @@ async function handleTransactionAnalysis(payload: any) {
     
     console.log('✅ Analysis complete:', analysisResponse);
     
+    // Load user settings from storage
+    const storage = await chrome.storage.local.get(['settings']);
+    const userSettings = storage.settings || {};
+    const autoBlockHighRisk = userSettings.auto_block_high_risk || false;
+    
+    console.log('⚙️ User settings:', { autoBlockHighRisk });
+    
+    const riskLevel = analysisResponse.analysis.level;
+    const isHighRisk = riskLevel === 'high';
+    
+    let blocked = false;
+    let approved = true;
+    let blockReason = '';
+    let requiresApproval = false;
+    
+    // Handle high risk transactions
+    if (isHighRisk) {
+      console.log('⚠️ HIGH RISK transaction detected!');
+      
+      if (autoBlockHighRisk) {
+        // AUTO-BLOCK: Block automatically
+        blocked = true;
+        approved = false;
+        blockReason = `🛡️ High risk transaction blocked automatically (Risk: ${analysisResponse.analysis.score}/100)`;
+        console.error('🚫 AUTO-BLOCKING transaction');
+      } else {
+        // MANUAL APPROVAL: Show UI and wait for user decision
+        console.log('🔔 Requires manual approval from user');
+        requiresApproval = true;
+        
+        try {
+          // Open popup for user approval
+          await chrome.action.openPopup();
+          
+          // Store transaction data for popup to access
+          await chrome.storage.local.set({
+            pendingTransaction: {
+              id: `tx_${Date.now()}`,
+              riskScore: analysisResponse.analysis.score,
+              riskLevel: analysisResponse.analysis.level,
+              reasons: analysisResponse.analysis.reasons,
+              recommendations: analysisResponse.analysis.recommendations,
+              parsedTx,
+              timestamp: Date.now(),
+            }
+          });
+          
+          // Wait for user decision (with timeout)
+          const userDecision = await waitForUserApproval(10000); // 10 second timeout
+          
+          approved = userDecision.approved;
+          if (!approved) {
+            blocked = true;
+            blockReason = '🛡️ Transaction rejected by user';
+          }
+          
+        } catch (error) {
+          console.warn('Could not get user approval, defaulting to ALLOW:', error);
+          // On error, default to allowing (don't want to break user flow)
+          approved = true;
+        }
+      }
+    } else {
+      // Low/Medium risk: always approve
+      console.log(`✅ ${riskLevel.toUpperCase()} risk - allowing transaction`);
+      approved = true;
+    }
+    
     const result = {
       success: true,
       riskScore: analysisResponse.analysis.score,
@@ -121,29 +222,28 @@ async function handleTransactionAnalysis(payload: any) {
       transaction: analysisResponse.transaction,
       cached: analysisResponse.cached,
       parsedTransaction: parsedTx,
+      // Blocking/Approval fields
+      blocked,
+      approved,
+      blockReason,
+      requiresApproval,
     };
-    
-    // Se for alto risco, abre o popup automaticamente
-    if (analysisResponse.analysis.level === 'high') {
-      console.log('⚠️ HIGH RISK detected! Opening popup...');
-      try {
-        await chrome.action.openPopup();
-      } catch (error) {
-        console.warn('Could not open popup automatically:', error);
-      }
-    }
     
     return result;
   } catch (error: any) {
     console.error('❌ Error in transaction analysis:', error);
     
-    // Return a safe default response
+    // Return a safe default response (allow transaction on error)
     return {
       success: false,
       error: error.message,
       riskScore: 50,
       riskLevel: 'medium',
       reasons: ['Unable to analyze transaction'],
+      blocked: false,
+      approved: true, // Default to allowing on error
+      blockReason: '',
+      requiresApproval: false,
     };
   }
 }
