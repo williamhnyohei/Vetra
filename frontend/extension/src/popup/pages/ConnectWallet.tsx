@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuthStore } from '@/store/auth-store';
 
 interface ConnectWalletProps {
   onBack?: () => void;
@@ -10,6 +11,7 @@ type ConnectResult = {
   success: boolean;
   publicKey?: string;
   error?: string;
+  provider?: 'phantom' | 'backpack' | 'solflare' | 'other';
 };
 
 async function sendToActiveTab<T = any>(msg: any): Promise<T> {
@@ -43,36 +45,71 @@ async function requestWalletConnect(provider: ProviderName): Promise<ConnectResu
   }
 }
 
+const providerLabel = (p?: string | null): string => {
+  if (p === 'phantom') return 'Phantom';
+  if (p === 'backpack') return 'Backpack';
+  if (p === 'solflare') return 'Solflare';
+  if (p === 'other') return 'Wallet';
+  return 'Wallet';
+};
+
 const ConnectWallet: React.FC<ConnectWalletProps> = ({ onBack }) => {
-  const [pubkey, setPubkey] = useState<string | null>(null);
+  const {
+    wallet,
+    setWalletConnected,
+    disconnectWallet,
+  } = useAuthStore((s) => ({
+    wallet: s.wallet,
+    setWalletConnected: s.setWalletConnected,
+    disconnectWallet: s.disconnectWallet,
+  }));
+
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<boolean>(false);
   const [lastProvider, setLastProvider] = useState<ProviderName | null>(null);
+  const [lastPubkey, setLastPubkey] = useState<string | null>(null);
 
   const handleConnect = async (provider: ProviderName) => {
     setBusy(true);
     setErr(null);
-    setPubkey(null);
     setLastProvider(provider);
 
     const res = await requestWalletConnect(provider);
     setBusy(false);
 
-    if (!res?.success) {
+    if (!res?.success || !res.publicKey) {
       setErr(res?.error || 'Failed to connect');
       return;
     }
-    setPubkey(res.publicKey || null);
+
+    // provider real que o injected detectou
+    const detectedProvider =
+      res.provider && res.provider !== 'other'
+        ? res.provider
+        : provider === 'auto'
+        ? 'other'
+        : provider;
+
+    // salva globalmente
+    setWalletConnected({
+      address: res.publicKey,
+      provider: detectedProvider as any,
+      connectedAt: Date.now(),
+    });
+
+    setLastPubkey(res.publicKey);
   };
 
-  const connectedLabel =
-    lastProvider === 'phantom'
-      ? 'Phantom'
-      : lastProvider === 'backpack'
-      ? 'Backpack'
-      : lastProvider === 'solflare'
-      ? 'Solflare'
-      : 'Wallet';
+  const handleDisconnect = () => {
+    disconnectWallet();
+    setLastPubkey(null);
+    setLastProvider(null);
+    setErr(null);
+  };
+
+  // dado mostrado no topo: prioriza o que está no store
+  const activeWalletAddress = wallet?.address || lastPubkey;
+  const activeWalletProvider = wallet?.provider || (lastProvider as string | null);
 
   return (
     <div className="w-full h-full bg-dark-bg text-dark-text p-4 space-y-6 overflow-y-auto">
@@ -96,9 +133,19 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onBack }) => {
             Connect Wallet
           </h1>
         </div>
+
+        {/* se tem wallet, mostra disconnect */}
+        {activeWalletAddress ? (
+          <button
+            onClick={handleDisconnect}
+            className="text-xs px-3 py-1 rounded-full bg-red-500/10 text-red-300 hover:bg-red-500/20"
+          >
+            Disconnect
+          </button>
+        ) : null}
       </div>
 
-      {/* Intro */}
+      {/* Intro + status */}
       <div className="text-center">
         <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center">
           <svg className="w-16 h-16 text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
@@ -117,14 +164,15 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onBack }) => {
           Choose your wallet to start protecting your transactions.
         </p>
 
-        {pubkey && (
+        {activeWalletAddress ? (
           <p className="mt-2 text-xs text-green-400">
-            Connected ({connectedLabel}):{' '}
+            Connected ({providerLabel(activeWalletProvider)}):{' '}
             <span className="font-mono">
-              {pubkey.slice(0, 6)}…{pubkey.slice(-6)}
+              {activeWalletAddress.slice(0, 6)}…{activeWalletAddress.slice(-6)}
             </span>
           </p>
-        )}
+        ) : null}
+
         {err && (
           <p className="mt-2 text-xs text-red-400">
             {err}
@@ -191,7 +239,7 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onBack }) => {
           className={`w-full rounded-lg p-4 flex items-center justify-between transition-colors ${
             busy ? 'opacity-60 cursor-not-allowed' : 'hover:opacity-90'
           }`}
-          style={{ backgroundColor: '#FF6B00' }} // laranja solflare
+          style={{ backgroundColor: '#FF6B00' }}
         >
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
