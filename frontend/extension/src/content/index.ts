@@ -26,23 +26,46 @@ window.addEventListener('message', async (event) => {
   const message = event.data;
   
   if (message.type === 'VETRA_TRANSACTION_REQUEST') {
-    console.log('Intercepted transaction:', message.payload);
+    console.log('🔒 VETRA: Transaction intercepted on Solana Mainnet');
+    console.log('🌐 URL:', message.payload.url);
+    console.log('🔧 Method:', message.payload.method);
+    console.log('📦 Transaction:', message.payload.transaction);
 
-    // Send to background for analysis
-    const response = await chrome.runtime.sendMessage({
-      type: 'ANALYZE_TRANSACTION',
-      payload: message.payload,
-    });
+    try {
+      // Send to background for analysis
+      const response = await chrome.runtime.sendMessage({
+        type: 'ANALYZE_TRANSACTION',
+        payload: message.payload,
+      });
 
-    // Send response back to injected script
-    window.postMessage(
-      {
-        type: 'VETRA_TRANSACTION_RESPONSE',
-        id: message.id,
-        response,
-      },
-      '*'
-    );
+      console.log('✅ Analysis complete:', response);
+
+      // Send response back to injected script
+      window.postMessage(
+        {
+          type: 'VETRA_TRANSACTION_RESPONSE',
+          id: message.id,
+          response,
+        },
+        '*'
+      );
+    } catch (error) {
+      console.error('❌ Error analyzing transaction:', error);
+      
+      // Send error response
+      window.postMessage(
+        {
+          type: 'VETRA_TRANSACTION_RESPONSE',
+          id: message.id,
+          response: {
+            success: false,
+            error: 'Analysis failed',
+            approved: true, // Default to allowing on error
+          },
+        },
+        '*'
+      );
+    }
   }
 });
 

@@ -6,7 +6,9 @@ import ApiService from '../services/api-service';
 import AuthService from '../services/auth-service';
 
 // Background Service Worker for MV3
-console.log('Vetra background service worker initialized');
+console.log('🛡️ Vetra background service worker initialized');
+console.log('🌐 Network: Solana Mainnet');
+console.log('🔒 Transaction interception: ACTIVE');
 
 // Initialize services
 const apiService = ApiService.getInstance();
@@ -69,13 +71,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  */
 async function handleTransactionAnalysis(payload: any) {
   try {
-    console.log('🔍 Analyzing transaction:', payload);
+    console.log('🔍 Analyzing transaction on Solana Mainnet');
+    console.log('🌐 Origin URL:', payload.url);
+    console.log('🔧 Method:', payload.method);
+    console.log('⏰ Timestamp:', new Date(payload.timestamp).toISOString());
     
     // Parse the transaction from the payload
     const transaction = reconstructTransaction(payload.transaction);
     const parsedTx = parseTransaction(transaction);
     
     console.log('📊 Parsed transaction:', parsedTx);
+    console.log('💰 Amount:', parsedTx.amount);
+    console.log('📤 From:', parsedTx.fromAddress);
+    console.log('📥 To:', parsedTx.toAddress);
     
     // Prepare transaction data for API
     const transactionData = {

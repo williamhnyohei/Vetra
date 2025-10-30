@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useLanguageStore } from '../../store/language-store';
+import { t } from '../../i18n';
 import ApiService from '../../services/api-service';
 
 interface PlansProps {
@@ -6,6 +8,7 @@ interface PlansProps {
 }
 
 const Plans: React.FC<PlansProps> = ({ onBack }) => {
+  const { language } = useLanguageStore();
   const [isUpgrading, setIsUpgrading] = useState(false);
   const [upgradeSuccess, setUpgradeSuccess] = useState(false);
 
@@ -55,7 +58,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
               color: '#E6E6E6'
             }}
           >
-            Choose your plan
+            {t('plans.title', language)}
           </h1>
         </div>
       </div>
@@ -73,7 +76,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
               color: '#E6E6E6'
             }}
           >
-            FREE
+            {t('plans.free', language)}
           </h2>
           <span 
             style={{
@@ -85,7 +88,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
               color: '#858C94'
             }}
           >
-            Current plan
+            {t('plans.currentPlan', language)}
           </span>
         </div>
         
@@ -100,7 +103,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
               color: '#E6E6E6'
             }}
           >
-            $0
+            {t('plans.price.free', language)}
           </p>
           <p 
             style={{
@@ -112,7 +115,7 @@ const Plans: React.FC<PlansProps> = ({ onBack }) => {
               color: '#E6E6E6'
             }}
           >
-            Basic protection to get started
+            {t('plans.description.free', language)}
           </p>
         </div>
 
