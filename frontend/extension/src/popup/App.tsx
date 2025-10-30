@@ -35,7 +35,7 @@ function App() {
       chrome.storage.local.get(['pendingTransaction'], (result) => {
         if (result.pendingTransaction) {
           setHasPendingTransaction(true);
-          setCurrentPage('transaction-approval');
+          // NÃO redireciona mais automaticamente, apenas marca que há transação pendente
         } else {
           setHasPendingTransaction(false);
         }
@@ -51,12 +51,12 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Update current page when auth status changes (only if no pending transaction)
+  // Update current page when auth status changes
   useEffect(() => {
-    if (!isLoading && !hasPendingTransaction) {
+    if (!isLoading) {
       setCurrentPage(isAuthenticated ? 'home' : 'welcome');
     }
-  }, [isAuthenticated, isLoading, hasPendingTransaction]);
+  }, [isAuthenticated, isLoading]);
 
   const renderPage = () => {
     switch (currentPage) {
