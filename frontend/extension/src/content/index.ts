@@ -1,73 +1,81 @@
 /// <reference types="chrome"/>
 
-// Content Script - Runs in the context of web pages
-console.log('🟢 Vetra content script loaded');
-console.log('📍 URL:', window.location.href);
+// Content Script — roda em todas as páginas
+console.log('🟢 Vetra content script loaded at', window.location.href);
 
-// Inject our script into the page context
-const script = document.createElement('script');
-script.src = chrome.runtime.getURL('injected.js');
-script.onload = function () {
-  console.log('✅ Injected script loaded successfully');
-  // @ts-ignore
-  this.remove();
-};
-script.onerror = function() {
-  console.error('❌ Failed to load injected script');
-};
-(document.head || document.documentElement).appendChild(script);
-console.log('📝 Injected script element added to page');
+// 1) pede pro background injetar o script no contexto da página
+chrome.runtime.sendMessage({ type: 'INJECT_PAGE_SCRIPT' }, (res) => {
+  if (!res?.ok) {
+    console.error('❌ Failed to inject via scripting:', res?.error);
+  } else {
+    console.log('✅ Injected via chrome.scripting');
+  }
+});
 
-// Listen for messages from injected script
+// 2) Bridge: POPUP → CONTENT → INJECTED (conectar carteira)
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  // aceitamos os dois tipos que você já usou no popup
+  if (msg?.type === 'VETRA_CONNECT' || msg?.type === 'VETRA_CONNECT_WALLET') {
+    // pode vir do popup como {payload: {provider: 'phantom' | 'backpack' | 'solflare' | 'auto'}}
+    const provider =
+      (msg?.payload?.provider as
+        | 'phantom'
+        | 'backpack'
+        | 'solflare'
+        | 'auto'
+        | undefined) || 'auto';
+
+    // id pra parear req/res
+    const id =
+      (crypto as any)?.randomUUID?.() ||
+      Math.random().toString(36).slice(2);
+
+    const handler = (ev: MessageEvent) => {
+      const data = ev.data || {};
+      if (data?.type === 'VETRA_CONNECT_RES' && data.id === id) {
+        window.removeEventListener('message', handler);
+        // devolve pro popup exatamente o que o injected mandou
+        sendResponse(data);
+      }
+    };
+
+    window.addEventListener('message', handler);
+
+    // manda pro contexto da página (injected.js vai ouvir isso)
+    window.postMessage(
+      {
+        type: 'VETRA_CONNECT',
+        id,
+        provider,
+      },
+      '*'
+    );
+
+    // importante: manter o canal aberto pq a resposta vem depois
+    return true;
+  }
+});
+
+// 3) Bridge: INJECTED → CONTENT → BACKGROUND (analisar transação)
 window.addEventListener('message', async (event) => {
-  // Only accept messages from same window
   if (event.source !== window) return;
-
   const message = event.data;
-  
-  if (message.type === 'VETRA_TRANSACTION_REQUEST') {
-    console.log('🔒 VETRA: Transaction intercepted on Solana Mainnet');
-    console.log('🌐 URL:', message.payload.url);
-    console.log('🔧 Method:', message.payload.method);
-    console.log('📦 Transaction:', message.payload.transaction);
 
-    try {
-      // Send to background for analysis
-      const response = await chrome.runtime.sendMessage({
-        type: 'ANALYZE_TRANSACTION',
-        payload: message.payload,
-      });
+  if (message?.type === 'VETRA_TRANSACTION_REQUEST') {
+    const response = await chrome.runtime.sendMessage({
+      type: 'ANALYZE_TRANSACTION',
+      payload: message.payload,
+    });
 
-      console.log('✅ Analysis complete:', response);
-
-      // Send response back to injected script
-      window.postMessage(
-        {
-          type: 'VETRA_TRANSACTION_RESPONSE',
-          id: message.id,
-          response,
-        },
-        '*'
-      );
-    } catch (error) {
-      console.error('❌ Error analyzing transaction:', error);
-      
-      // Send error response
-      window.postMessage(
-        {
-          type: 'VETRA_TRANSACTION_RESPONSE',
-          id: message.id,
-          response: {
-            success: false,
-            error: 'Analysis failed',
-            approved: true, // Default to allowing on error
-          },
-        },
-        '*'
-      );
-    }
+    window.postMessage(
+      {
+        type: 'VETRA_TRANSACTION_RESPONSE',
+        id: message.id,
+        response,
+      },
+      '*'
+    );
   }
 });
 
 export {};
-
