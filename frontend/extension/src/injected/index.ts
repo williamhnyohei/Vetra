@@ -142,6 +142,8 @@ if ((window as any).__VETRA_INJECTED__) {
           return async function (...args: any[]) {
             const requestId = Math.random().toString(36).substring(7);
 
+            console.log('🔐 Vetra: Intercepting transaction signature request');
+
             // manda pra extension analisar
             window.postMessage(
               {
@@ -155,11 +157,12 @@ if ((window as any).__VETRA_INJECTED__) {
               '*'
             );
 
-            // espera resposta ou dá timeout
-            await new Promise((resolve) => {
+            // espera resposta com decisão do usuário
+            const userDecision = await new Promise<{ approved: boolean; shouldBlock: boolean }>((resolve) => {
               const timeout = setTimeout(() => {
-                resolve(true); // segue mesmo sem resposta
-              }, 5000);
+                console.warn('⚠️ Vetra: Analysis timeout, proceeding with transaction');
+                resolve({ approved: true, shouldBlock: false }); // timeout → permite por segurança
+              }, 30000); // 30s timeout
 
               const listener = (event: MessageEvent) => {
                 if (
@@ -169,14 +172,30 @@ if ((window as any).__VETRA_INJECTED__) {
                 ) {
                   clearTimeout(timeout);
                   window.removeEventListener('message', listener);
-                  resolve(true);
+                  
+                  const response = event.data?.response || {};
+                  console.log('✅ Vetra: Received analysis response:', response);
+                  
+                  // Se high risk e usuário não aprovou, bloquear
+                  const shouldBlock = response.riskLevel === 'high' && !response.userApproved;
+                  resolve({ 
+                    approved: response.userApproved ?? true, 
+                    shouldBlock 
+                  });
                 }
               };
 
               window.addEventListener('message', listener);
             });
 
-            // no MVP, deixa a carteira seguir o fluxo normal
+            // Se usuário bloqueou, lançar erro
+            if (userDecision.shouldBlock || !userDecision.approved) {
+              console.log('🚫 Vetra: Transaction blocked by user');
+              throw new Error('Transaction blocked by Vetra security analysis');
+            }
+
+            console.log('✅ Vetra: Transaction approved, proceeding to sign');
+            // permite a carteira seguir o fluxo normal
             return original.apply(target, args);
           };
         }

@@ -48,7 +48,43 @@ router.post('/analyze', authenticateToken, [
       });
     }
 
-    // Perform risk analysis using Multi-Agent System
+    // 📌 STEP 1: SAVE IMMEDIATELY AS 'INTERCEPTED' (before analysis)
+    logger.info('💾 Step 1: Saving transaction as INTERCEPTED (before analysis)...', {
+      userId,
+      type: transactionData.type,
+      from: transactionData.from,
+      to: transactionData.to,
+      amount: transactionData.amount,
+    });
+
+    const [initialTransaction] = await db('transactions')
+      .insert({
+        user_id: userId,
+        signature: transactionData.signature,
+        transaction_hash: transactionData.signature,
+        type: transactionData.type,
+        from_address: transactionData.from,
+        to_address: transactionData.to,
+        amount: transactionData.amount,
+        token_address: transactionData.token,
+        risk_score: null, // ainda não analisado
+        risk_level: null,
+        risk_reasons: null,
+        heuristics: null,
+        status: 'intercepted', // Status inicial: transação foi interceptada
+        analyzed_at: null,
+        created_at: new Date(),
+      })
+      .returning('*');
+    
+    logger.info('✅ Step 1 COMPLETE: Transaction saved as INTERCEPTED!', {
+      transactionId: initialTransaction.id,
+      status: 'intercepted',
+    });
+
+    // 📌 STEP 2: PERFORM RISK ANALYSIS
+    logger.info('🤖 Step 2: Performing risk analysis with Multi-Agent System...');
+    
     const analysis = await analyzeTransactionWithMultiAgent(transactionData, {
       userId,
       analysisDepth: 'standard',
@@ -59,42 +95,32 @@ router.post('/analyze', authenticateToken, [
     // Cache the analysis
     await cache.set(cacheKey, analysis, 3600); // 1 hour
 
-    logger.info('🔄 Attempting to save transaction to database...', {
-      userId,
-      type: transactionData.type,
-      from: transactionData.from,
-      to: transactionData.to,
-      amount: transactionData.amount,
+    // 📌 STEP 3: UPDATE WITH ANALYSIS RESULTS (still pending user decision)
+    logger.info('💾 Step 3: Updating transaction with analysis results...', {
+      transactionId: initialTransaction.id,
       riskScore: analysis.score,
       riskLevel: analysis.level,
     });
 
-    // Save transaction to database
     const [transaction] = await db('transactions')
-      .insert({
-        user_id: userId,
-        signature: transactionData.signature,
-        transaction_hash: transactionData.signature,
-        type: transactionData.type,
-        from_address: transactionData.from,
-        to_address: transactionData.to,
-        amount: transactionData.amount,
-        token_address: transactionData.token,
+      .where({ id: initialTransaction.id })
+      .update({
         risk_score: analysis.score,
         risk_level: analysis.level,
         risk_reasons: JSON.stringify(analysis.reasons || []),
         heuristics: JSON.stringify(analysis.heuristics || {}),
-        status: 'pending',
+        status: 'pending', // Status muda para pending (aguardando decisão do usuário)
         analyzed_at: new Date(),
+        updated_at: new Date(),
       })
       .returning('*');
     
-    logger.info('✅ Transaction saved to database SUCCESSFULLY!', {
+    logger.info('✅ Step 3 COMPLETE: Transaction updated with analysis!', {
       transactionId: transaction.id,
       userId,
       riskLevel: analysis.level,
       riskScore: analysis.score,
-      dbRow: transaction,
+      status: 'pending',
     });
 
     res.json({
