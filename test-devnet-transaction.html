@@ -163,10 +163,19 @@
         <button id="sendBtn" onclick="sendTestTransaction()" disabled>
             🚀 Enviar Transação de Teste (0.01 SOL)
         </button>
+        
+        <button id="fakeTxBtn" onclick="generateFakeTransaction()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            🎲 Simular Transação
+        </button>
 
         <button onclick="clearLogs()">
             🗑️ Limpar Logs
         </button>
+        
+        <div id="fakeStats" style="margin-top: 20px; padding: 15px; background: rgba(102, 126, 234, 0.1); border-radius: 8px; border: 1px solid rgba(102, 126, 234, 0.3); display: none;">
+            <h4 style="margin: 0 0 10px 0; color: #667eea;">📊 Última Transação Analisada:</h4>
+            <div id="fakeDetails" style="font-size: 14px; line-height: 1.8;"></div>
+        </div>
 
         <div class="logs" id="logs"></div>
     </div>
@@ -352,6 +361,181 @@
                 clearInterval(checkInterval);
             }
         }, 500);
+        // ================================================================
+        // 🎲 SIMULADOR DE TRANSAÇÕES (PARA DEMONSTRAÇÃO)
+        // ================================================================
+        
+        const TOKENS = ['SOL', 'USDC', 'USDT', 'RAY', 'SRM', 'ORCA'];
+        
+        const RISK_SCENARIOS = [
+            {
+                level: 'low',
+                scoreRange: [0, 30],
+                reasons: [
+                    'Endereço conhecido e verificado',
+                    'Transação de valor normal',
+                    'Destinatário possui boa reputação',
+                    'Sem sinais de phishing'
+                ]
+            },
+            {
+                level: 'medium',
+                scoreRange: [31, 60],
+                reasons: [
+                    'Endereço novo sem histórico',
+                    'Valor acima da média',
+                    'Contrato não auditado',
+                    'Atividade recente suspeita no destino'
+                ]
+            },
+            {
+                level: 'high',
+                scoreRange: [61, 85],
+                reasons: [
+                    'Endereço associado a múltiplos scams',
+                    'Padrão similar a rugpull',
+                    'Site usa técnicas de phishing',
+                    'Valor muito alto para conta nova'
+                ]
+            },
+            {
+                level: 'critical',
+                scoreRange: [86, 100],
+                reasons: [
+                    '🚨 SCAM CONFIRMADO - Endereço em blacklist',
+                    '🚨 Site de phishing detectado',
+                    '🚨 Contrato malicioso identificado',
+                    '🚨 Tentativa de drenagem de carteira'
+                ]
+            }
+        ];
+        
+        function generateRandomAddress() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz123456789';
+            let address = '';
+            for (let i = 0; i < 44; i++) {
+                address += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return address;
+        }
+        
+        function generateAmount(token) {
+            if (token === 'SOL') {
+                return (Math.random() * 100 + 0.01).toFixed(6);
+            } else if (token === 'USDC' || token === 'USDT') {
+                return (Math.random() * 10000 + 1).toFixed(2);
+            } else {
+                return (Math.random() * 100000 + 10).toFixed(2);
+            }
+        }
+        
+        function selectRiskScenario() {
+            const rand = Math.random() * 100;
+            if (rand < 50) return RISK_SCENARIOS[0]; // 50% low
+            if (rand < 80) return RISK_SCENARIOS[1]; // 30% medium
+            if (rand < 95) return RISK_SCENARIOS[2]; // 15% high
+            return RISK_SCENARIOS[3]; // 5% critical
+        }
+        
+        async function generateFakeTransaction() {
+            log('🎲 Simulando transação...', 'info');
+            
+            if (!walletPublicKey) {
+                log('⚠️ Conecte a wallet primeiro!', 'warning');
+                return;
+            }
+            
+            const scenario = selectRiskScenario();
+            const token = TOKENS[Math.floor(Math.random() * TOKENS.length)];
+            const amount = generateAmount(token);
+            const toAddress = generateRandomAddress();
+            
+            const [minScore, maxScore] = scenario.scoreRange;
+            const riskScore = Math.floor(Math.random() * (maxScore - minScore + 1)) + minScore;
+            
+            const numReasons = Math.floor(Math.random() * 2) + 2;
+            const shuffledReasons = [...scenario.reasons].sort(() => Math.random() - 0.5);
+            const selectedReasons = shuffledReasons.slice(0, numReasons);
+            
+            // Gerar hash realista (64 caracteres hex)
+            const generateTxHash = () => {
+                const chars = '0123456789abcdef';
+                let hash = '';
+                for (let i = 0; i < 64; i++) {
+                    hash += chars[Math.floor(Math.random() * chars.length)];
+                }
+                return hash;
+            };
+            
+            const fakeTransaction = {
+                transaction_hash: generateTxHash(),
+                from_address: walletPublicKey.toString(),
+                to_address: toAddress,
+                amount: amount,
+                token: token,
+                network: 'devnet',
+                status: 'pending',
+                metadata: JSON.stringify({
+                    generated_at: new Date().toISOString(),
+                    risk_score: riskScore,
+                    risk_level: scenario.level,
+                    risk_reasons: selectedReasons
+                })
+            };
+            
+            log(`💰 Valor: ${amount} ${token}`, 'info');
+            log(`📊 Nível de Risco: ${scenario.level.toUpperCase()} (${riskScore}/100)`, 
+                scenario.level === 'critical' ? 'error' : scenario.level === 'high' ? 'warning' : 'info');
+            log(`📍 Para: ${toAddress.substring(0, 20)}...`, 'info');
+            
+            // Mostrar detalhes
+            const statsDiv = document.getElementById('fakeStats');
+            const detailsDiv = document.getElementById('fakeDetails');
+            
+            const riskColor = {
+                low: '#10b981',
+                medium: '#f59e0b',
+                high: '#ef4444',
+                critical: '#dc2626'
+            }[scenario.level];
+            
+            detailsDiv.innerHTML = `
+                <div style="color: #333;"><strong>💰 Valor:</strong> ${amount} ${token}</div>
+                <div style="color: ${riskColor};"><strong>📊 Risco:</strong> ${scenario.level.toUpperCase()} (${riskScore}/100)</div>
+                <div style="color: #666;"><strong>📍 Destino:</strong> ${toAddress.substring(0, 30)}...</div>
+                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(102, 126, 234, 0.2);">
+                    <strong>⚠️ Razões:</strong>
+                    <ul style="margin: 5px 0 0 20px; padding: 0;">
+                        ${selectedReasons.map(r => `<li style="margin: 3px 0;">${r}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+            statsDiv.style.display = 'block';
+            
+            // Enviar para o backend (endpoint público para demos)
+            try {
+                log('📤 Enviando para backend...', 'info');
+                
+                const response = await fetch('https://vetra-production.up.railway.app/api/transactions/analyze-demo', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(fakeTransaction)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    log('✅ Transação analisada e salva!', 'success');
+                    log(`🆔 ID: ${result.id || result.transaction_id || 'N/A'}`, 'success');
+                } else {
+                    const error = await response.text();
+                    log(`❌ Erro ao salvar: ${error}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Erro de rede: ${error.message}`, 'error');
+            }
+        }
     </script>
 </body>
 </html>

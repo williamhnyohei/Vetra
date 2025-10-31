@@ -13,7 +13,7 @@ const logger = require('../utils/logger');
 
 const router = express.Router();
 
-// Analyze transaction
+// Analyze transaction (requires authentication)
 router.post('/analyze', authenticateToken, [
   body('transactionData').isObject().notEmpty(),
   body('transactionData.signature').optional().isString(),
@@ -152,6 +152,99 @@ router.post('/analyze', authenticateToken, [
   }
 });
 
+// 🎲 Analyze transaction (DEMO/PUBLIC - no authentication required)
+router.post('/analyze-demo', [
+  body('transaction_hash').optional().isString(),
+  body('from_address').isString().notEmpty(),
+  body('to_address').isString().notEmpty(),
+  body('amount').isString().notEmpty(),
+  body('token').optional().isString(),
+  body('network').optional().isString(),
+  body('metadata').optional().isString(),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: errors.array(),
+      });
+    }
+
+    logger.info('🎲 DEMO: Analyzing transaction without authentication', {
+      from: req.body.from_address,
+      to: req.body.to_address,
+      amount: req.body.amount,
+    });
+
+    // Parse metadata if it's a string
+    let metadata = {};
+    if (req.body.metadata) {
+      try {
+        metadata = typeof req.body.metadata === 'string' 
+          ? JSON.parse(req.body.metadata) 
+          : req.body.metadata;
+      } catch (e) {
+        logger.warn('Failed to parse metadata:', e);
+      }
+    }
+
+    // Extract risk info from metadata if available
+    const riskScore = metadata.risk_score || Math.floor(Math.random() * 100);
+    const riskLevel = metadata.risk_level || 
+      (riskScore < 30 ? 'low' : riskScore < 60 ? 'medium' : riskScore < 85 ? 'high' : 'critical');
+    const riskReasons = metadata.risk_reasons || [];
+
+    // Save transaction with user_id = null (public demo transaction)
+    const [transaction] = await db('transactions')
+      .insert({
+        user_id: null, // Public demo transaction
+        signature: req.body.transaction_hash,
+        transaction_hash: req.body.transaction_hash,
+        type: 'transfer',
+        from_address: req.body.from_address,
+        to_address: req.body.to_address,
+        amount: req.body.amount,
+        token_address: req.body.token,
+        token_symbol: req.body.token,
+        risk_score: riskScore,
+        risk_level: riskLevel,
+        risk_reasons: JSON.stringify(riskReasons),
+        heuristics: JSON.stringify({ demo: true }),
+        status: 'pending',
+        analyzed_at: new Date(),
+        created_at: new Date(),
+      })
+      .returning('*');
+
+    logger.info('✅ DEMO: Transaction saved!', {
+      id: transaction.id,
+      riskScore,
+      riskLevel,
+    });
+
+    res.json({
+      success: true,
+      id: transaction.id,
+      transaction_id: transaction.id,
+      analysis: {
+        score: riskScore,
+        level: riskLevel,
+        reasons: riskReasons,
+      },
+    });
+
+  } catch (error) {
+    logger.error('Demo transaction analysis error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Transaction analysis failed',
+      details: error.message,
+    });
+  }
+});
+
 // Get transaction history
 router.get('/history', authenticateToken, [
   query('page').optional().isInt({ min: 1 }).toInt(),
@@ -179,8 +272,10 @@ router.get('/history', authenticateToken, [
 
     const offset = (page - 1) * limit;
 
-    // Build query
-    let query = db('transactions').where({ user_id: userId });
+    // Build query - include user's transactions AND public demo transactions (user_id = null)
+    let query = db('transactions').where(function() {
+      this.where({ user_id: userId }).orWhere({ user_id: null });
+    });
 
     if (status) {
       query = query.where({ status });
