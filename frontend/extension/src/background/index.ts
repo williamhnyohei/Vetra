@@ -55,6 +55,21 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true; // Keep channel open (async)
   }
 
+  // 🔥 Handle RPC transaction interception
+  if (message?.type === 'ANALYZE_RPC_TRANSACTION') {
+    console.log('🔥 Background: RPC transaction received, analyzing...');
+    handleRPCTransactionAnalysis(message.payload)
+      .then(sendResponse)
+      .catch((error) => {
+        console.error('❌ Error analyzing RPC transaction:', error);
+        sendResponse({
+          success: false,
+          error: error?.message || String(error),
+        });
+      });
+    return true; // Keep channel open (async)
+  }
+
   if (message?.type === 'GET_ATTESTATIONS') {
     handleGetAttestations(message.payload)
       .then(sendResponse)
@@ -156,6 +171,60 @@ async function handleTransactionAnalysis(payload: any) {
       riskScore: 50,
       riskLevel: 'medium',
       reasons: ['Unable to analyze transaction'],
+    };
+  }
+}
+
+/**
+ * Handle RPC transaction analysis (network level interception)
+ */
+async function handleRPCTransactionAnalysis(payload: any) {
+  try {
+    console.log('🔥 Analyzing RPC transaction...', payload);
+
+    const { url, method, params, body } = payload || {};
+    
+    // Extract transaction data from RPC params
+    // Solana sendTransaction format: ["base64_transaction", {encoding: "base64"}]
+    const transactionData = {
+      signature: undefined,
+      type: 'rpc_send', // Special type for RPC-level detection
+      from: 'Unknown', // Will be extracted from transaction if possible
+      to: 'Unknown',
+      amount: '0',
+      token: undefined,
+      timestamp: Date.now(),
+      rpcMethod: method,
+      rpcUrl: url,
+      rpcParams: params,
+    };
+
+    console.log('📊 Extracted transaction data:', transactionData);
+
+    // Call backend for analysis
+    const authState = authService.getAuthState();
+    if (!authState?.isAuthenticated) {
+      console.warn('⚠️ User not authenticated, RPC analysis will not be saved');
+    }
+
+    const analysisResponse = await apiService.analyzeTransaction(transactionData);
+
+    console.log('✅ RPC transaction analyzed:', analysisResponse);
+
+    return {
+      success: true,
+      analysis: analysisResponse?.analysis,
+      riskLevel: analysisResponse?.analysis?.level,
+      riskScore: analysisResponse?.analysis?.score,
+    };
+
+  } catch (error: any) {
+    console.error('❌ Error analyzing RPC transaction:', error);
+    return {
+      success: false,
+      error: error?.message || String(error),
+      riskLevel: 'unknown',
+      riskScore: 50,
     };
   }
 }

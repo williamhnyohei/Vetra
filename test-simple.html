@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Vetra Simple Test</title>
+</head>
+<body>
+    <h1>🧪 Vetra Simple Injection Test</h1>
+    <p>Abra o console (F12) e veja se aparecem os logs do Vetra.</p>
+    
+    <h2>Testes:</h2>
+    <button onclick="testVetra()">1. Testar se Vetra está injetado</button><br><br>
+    <button onclick="testPhantom()">2. Testar se Phantom está disponível</button><br><br>
+    <button onclick="testWindowSolana()">3. Analisar window.solana</button>
+    
+    <pre id="output" style="background:#1e1e1e;color:#d4d4d4;padding:20px;margin-top:20px;"></pre>
+    
+    <script>
+        function log(msg) {
+            const output = document.getElementById('output');
+            output.textContent += msg + '\n';
+            console.log(msg);
+        }
+        
+        function testVetra() {
+            log('=== TESTE VETRA ===');
+            log('window.__VETRA_INJECTED__: ' + window.__VETRA_INJECTED__);
+            log('window.__VETRA_WRAPPED__: ' + window.__VETRA_WRAPPED__);
+            
+            if (window.__VETRA_INJECTED__) {
+                log('✅ Vetra script FOI injetado!');
+            } else {
+                log('❌ Vetra script NÃO foi injetado!');
+            }
+        }
+        
+        function testPhantom() {
+            log('=== TESTE PHANTOM ===');
+            log('window.solana exists: ' + !!window.solana);
+            log('window.solana.isPhantom: ' + window.solana?.isPhantom);
+            log('typeof signTransaction: ' + typeof window.solana?.signTransaction);
+        }
+        
+        function testWindowSolana() {
+            log('=== ANÁLISE window.solana ===');
+            
+            const descriptor = Object.getOwnPropertyDescriptor(window, 'solana');
+            log('Descriptor: ' + JSON.stringify({
+                hasGetter: !!descriptor?.get,
+                hasSetter: !!descriptor?.set,
+                writable: descriptor?.writable,
+                configurable: descriptor?.configurable
+            }, null, 2));
+            
+            log('window.solana: ' + window.solana);
+            log('Constructor: ' + window.solana?.constructor?.name);
+        }
+        
+        setTimeout(() => {
+            log('🌐 Página carregada. Aguardando Vetra e Phantom...');
+        }, 1000);
+    </script>
+</body>
+</html>
+
