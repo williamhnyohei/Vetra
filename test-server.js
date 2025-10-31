@@ -12,7 +12,13 @@ const PORT = 8080;
 const server = http.createServer((req, res) => {
   console.log(`📥 Request: ${req.method} ${req.url}`);
 
-  // Serve test page
+  // Common headers (permissive CSP for testing)
+  const headers = {
+    'Content-Type': 'text/html',
+    'Content-Security-Policy': "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: http: data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com chrome-extension:;",
+  };
+
+  // Serve test pages
   if (req.url === '/' || req.url === '/test') {
     const filePath = path.join(__dirname, 'test-devnet-transaction.html');
     
@@ -23,7 +29,24 @@ const server = http.createServer((req, res) => {
         return;
       }
 
-      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.writeHead(200, headers);
+      res.end(content);
+    });
+    return;
+  }
+
+  // Serve simple test page
+  if (req.url === '/simple') {
+    const filePath = path.join(__dirname, 'test-simple.html');
+    
+    fs.readFile(filePath, 'utf8', (err, content) => {
+      if (err) {
+        res.writeHead(500);
+        res.end('Error loading simple test page');
+        return;
+      }
+
+      res.writeHead(200, headers);
       res.end(content);
     });
     return;

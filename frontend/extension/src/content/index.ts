@@ -29,14 +29,77 @@ const isValidPage = (): boolean => {
 if (!isValidPage()) {
   console.log('⏭️ Vetra: Content script loaded but not injecting (system page)');
 } else {
-  // 1) pede pro background injetar o script no contexto da página
-  chrome.runtime.sendMessage({ type: 'INJECT_PAGE_SCRIPT' }, (res) => {
-    if (!res?.ok) {
-      console.error('❌ Failed to inject via scripting:', res?.error);
-    } else {
-      console.log('✅ Injected via chrome.scripting');
-    }
-  });
+  // ✅ ULTRA-FAST INJECTION: Inject code as inline string (faster than loading file)
+  console.log('🔥 VETRA: Injecting interceptor INLINE (fastest method)...');
+  
+  const inlineCode = `
+(function() {
+  console.log('🔥 VETRA INLINE: Running BEFORE Phantom loads...');
+  
+  if (window.__VETRA_INTERCEPTOR__) return;
+  window.__VETRA_INTERCEPTOR__ = true;
+  
+  let _wrapped = null;
+  let _original = null;
+  
+  try {
+    Object.defineProperty(window, 'solana', {
+      get() {
+        return _wrapped || _original;
+      },
+      set(provider) {
+        console.log('🔥🔥🔥 PHANTOM SETTING window.solana! INTERCEPTING NOW! 🔥🔥🔥');
+        _original = provider;
+        
+        if (!provider) return;
+        
+        _wrapped = new Proxy(provider, {
+          get(target, prop) {
+            const orig = target[prop];
+            
+            if (prop === 'signTransaction' || prop === 'signAllTransactions' || prop === 'signAndSendTransaction') {
+              console.log(\`🎯 VETRA PROXY: Accessing \${prop}\`);
+              return async function(...args) {
+                console.log('🔐🔐🔐 VETRA: TRANSACTION INTERCEPTED! 🔐🔐🔐');
+                console.log('Method:', prop);
+                console.log('Transaction:', args[0]);
+                
+                window.postMessage({
+                  type: 'VETRA_TX_INTERCEPTED',
+                  method: prop,
+                  transaction: args[0]
+                }, '*');
+                
+                // Allow for now
+                return orig.apply(target, args);
+              };
+            }
+            
+            return orig;
+          }
+        });
+        
+        console.log('✅✅✅ VETRA: Proxy created! All transactions will be intercepted! ✅✅✅');
+      },
+      configurable: true,
+      enumerable: true
+    });
+    
+    console.log('✅ VETRA: Property setter installed! Waiting for Phantom...');
+  } catch (e) {
+    console.error('❌ VETRA: Failed to install setter:', e);
+  }
+})();
+  `;
+
+  const script = document.createElement('script');
+  script.textContent = inlineCode;
+  script.id = 'vetra-interceptor';
+  
+  // Inject IMMEDIATELY at the START of documentElement
+  (document.documentElement || document.head || document.body || document).prepend(script);
+  
+  console.log('✅ VETRA: Inline script injected at START of page!');
 }
 
 // 2) Bridge: POPUP → CONTENT → INJECTED (conectar carteira)
@@ -88,6 +151,7 @@ window.addEventListener('message', async (event) => {
   if (event.source !== window) return;
   const message = event.data;
 
+  // Handle wallet signTransaction interception
   if (message?.type === 'VETRA_TRANSACTION_REQUEST') {
     const response = await chrome.runtime.sendMessage({
       type: 'ANALYZE_TRANSACTION',
@@ -102,6 +166,32 @@ window.addEventListener('message', async (event) => {
       },
       '*'
     );
+  }
+
+  // 🔥 Handle RPC transaction interception (network level)
+  if (message?.type === 'VETRA_RPC_TRANSACTION') {
+    console.log('🔥 Content: RPC transaction detected, forwarding to background...');
+    
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'ANALYZE_RPC_TRANSACTION',
+        payload: message.payload,
+      });
+
+      console.log('✅ Content: RPC analysis complete:', response);
+
+      // Send response back to injected script
+      window.postMessage(
+        {
+          type: 'VETRA_RPC_ANALYSIS_COMPLETE',
+          id: message.id,
+          analysis: response,
+        },
+        '*'
+      );
+    } catch (error) {
+      console.error('❌ Content: Error analyzing RPC transaction:', error);
+    }
   }
 });
 

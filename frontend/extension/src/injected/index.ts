@@ -7,6 +7,81 @@ if ((window as any).__VETRA_INJECTED__) {
   (window as any).__VETRA_INJECTED__ = true;
   console.log('🟣 Vetra injected script loaded');
 
+  // ✅ CRÍTICO: Instalar property setter IMEDIATAMENTE, ANTES de tudo!
+  // Isso intercepta quando Phantom tentar definir window.solana
+  let _solanaProvider: any = null;
+  let _wrappedProvider: any = null;
+  
+  console.log('🔥 CRITICAL: Installing property setter BEFORE Phantom loads...');
+  
+  try {
+    Object.defineProperty(window, 'solana', {
+      get() {
+        const result = _wrappedProvider || _solanaProvider;
+        if (result) {
+          console.log('🔍 Vetra Getter: Returning', result === _wrappedProvider ? 'WRAPPED ✅' : 'ORIGINAL ❌');
+        }
+        return result;
+      },
+      set(newProvider) {
+        console.log('🔥 Vetra Setter: Phantom is setting window.solana NOW!');
+        
+        if (newProvider && !_wrappedProvider) {
+          _solanaProvider = newProvider;
+          
+          console.log('🔥 Creating Proxy INLINE...');
+          
+          // Criar Proxy inline
+          _wrappedProvider = new Proxy(newProvider, {
+            get(target, prop, receiver) {
+              if (prop === 'signTransaction' || prop === 'signAllTransactions') {
+                console.log(`🔍 Vetra Proxy: Accessing ${String(prop)}`);
+              }
+              
+              const original = Reflect.get(target, prop, receiver);
+
+              if (prop === 'signTransaction' || prop === 'signAllTransactions') {
+                console.log(`🎯 Vetra Proxy: Returning intercepted ${String(prop)}`);
+                
+                return async function (...args: any[]) {
+                  console.log('🔐🔐🔐 VETRA: INTERCEPTING TRANSACTION! 🔐🔐🔐');
+                  console.log('🔐 Vetra: Transaction data:', args[0]);
+
+                  // Enviar para análise
+                  window.postMessage(
+                    {
+                      type: 'VETRA_TRANSACTION_REQUEST',
+                      id: Math.random().toString(36).substring(7),
+                      payload: { method: prop, transaction: args[0] },
+                    },
+                    '*'
+                  );
+
+                  // Por enquanto, permitir (vamos adicionar bloqueio depois)
+                  console.log('✅ Vetra: Proceeding with transaction (analysis sent to backend)');
+                  return original.apply(target, args);
+                };
+              }
+
+              return original;
+            },
+          });
+          
+          console.log('✅ Vetra Setter: Proxy created and saved to _wrappedProvider!');
+        } else if (newProvider) {
+          // Já foi wrappado
+          console.log('⏭️ Vetra Setter: Already wrapped, skipping');
+          _solanaProvider = newProvider;
+        }
+      },
+      configurable: true,
+      enumerable: true
+    });
+    console.log('🔥 SUCCESS: Property setter installed BEFORE Phantom!');
+  } catch (e) {
+    console.error('❌ FAILED to install property setter:', e);
+  }
+
   /**
    * Tenta descobrir o provider de acordo com o que o popup pediu.
    * Suporta: phantom, backpack, solflare e auto.
@@ -230,165 +305,123 @@ if ((window as any).__VETRA_INJECTED__) {
     }
   }
 
-  /**
-   * tenta achar provider e envolver; se não tiver ainda, fica tentando um pouco
-   */
-  const tryWrap = () => {
-    const prov =
-      pickProvider('auto') ||
-      (window as any).solana ||
-      (window as any).backpack ||
-      (window as any).solflare;
+  // ✅ Property setter já foi instalado no início do script!
+  console.log('✅ Vetra: Property setter strategy active - waiting for Phantom to load...');
 
-    if (prov && !(window as any).__VETRA_WRAPPED__) {
-      wrapSolanaProvider(prov);
-      (window as any).__VETRA_WRAPPED__ = true;
-      return true;
+  // =============================================================================
+  // 🔥 ESTRATÉGIA ADICIONAL: INTERCEPTAR RPC CALLS (NETWORK LEVEL)
+  // =============================================================================
+  // Esta é mais confiável pois não depende de wrapping de providers
+  
+  console.log('🌐 Installing RPC interceptors (fetch + XMLHttpRequest)...');
+
+  /**
+   * Check if request is a Solana sendTransaction
+   */
+  function isSolanaTransaction(url: string, body: any): boolean {
+    const isSolanaRPC = url && (
+      url.includes('solana') || 
+      url.includes('mainnet') || 
+      url.includes('devnet') ||
+      url.includes('testnet') ||
+      url.includes('rpcpool')
+    );
+    
+    if (!isSolanaRPC) return false;
+    
+    if (typeof body === 'string') {
+      try {
+        const parsed = JSON.parse(body);
+        return parsed.method === 'sendTransaction' || 
+               parsed.method === 'sendRawTransaction';
+      } catch {
+        return false;
+      }
     }
+    
     return false;
+  }
+
+  // Intercept fetch()
+  const originalFetch = window.fetch;
+  (window as any).fetch = async function(...args: any[]) {
+    const [urlOrRequest, options] = args;
+    const url = typeof urlOrRequest === 'string' ? urlOrRequest : urlOrRequest?.url;
+    const body = options?.body || (typeof urlOrRequest === 'object' ? urlOrRequest?.body : null);
+
+    if (url && isSolanaTransaction(url, body)) {
+      console.log('🔥🔥🔥 SOLANA TRANSACTION DETECTED VIA FETCH! 🔥🔥🔥');
+      console.log('📦 URL:', url);
+      console.log('📦 Body:', body);
+
+      try {
+        const txData = JSON.parse(body);
+        console.log('📊 Transaction method:', txData.method);
+        console.log('📊 Transaction params:', txData.params);
+
+        // Send to Vetra background for analysis
+        window.postMessage({
+          type: 'VETRA_RPC_TRANSACTION',
+          id: Math.random().toString(36).substring(7),
+          payload: {
+            url,
+            method: txData.method,
+            params: txData.params,
+            body,
+          }
+        }, '*');
+
+        console.log('✅ Transaction sent to Vetra for analysis');
+      } catch (e) {
+        console.warn('⚠️ Could not parse transaction body:', e);
+      }
+    }
+
+    return originalFetch.apply(this, args);
   };
 
-  // ✅ FIX: Usar múltiplas estratégias para interceptar Phantom
+  console.log('✅ Fetch interceptor installed');
 
-  // Estratégia 1: Tentar imediatamente
-  if (!tryWrap()) {
-    console.log('🟣 Vetra: Provider not found yet, setting up detection...');
+  // Intercept XMLHttpRequest
+  const originalXHROpen = XMLHttpRequest.prototype.open;
+  const originalXHRSend = XMLHttpRequest.prototype.send;
 
-    // Estratégia 2: Polling (tentar a cada 100ms por 10s)
-    let attempts = 0;
-    const maxAttempts = 100; // 10 segundos
-    const iv = setInterval(() => {
-      attempts++;
-      if (tryWrap()) {
-        console.log('✅ Vetra: Provider found via polling!');
-        clearInterval(iv);
-      } else if (attempts >= maxAttempts) {
-        clearInterval(iv);
-        console.warn('⚠️ Vetra injected: no Solana provider found after 10s');
-      }
-    }, 100);
+  XMLHttpRequest.prototype.open = function(method: string, url: string | URL, ...args: any[]) {
+    (this as any)._vetraUrl = url.toString();
+    return originalXHROpen.apply(this, [method, url, ...args]);
+  };
 
-    // Estratégia 3: MutationObserver (detectar quando window.solana é adicionado)
-    const observer = new MutationObserver(() => {
-      if ((window as any).solana && !(window as any).__VETRA_WRAPPED__) {
-        console.log('✅ Vetra: Provider detected via MutationObserver!');
-        tryWrap();
-        observer.disconnect();
-        clearInterval(iv);
-      }
-    });
-
-    observer.observe(document.documentElement, {
-      childList: true,
-      subtree: true,
-      attributes: false
-    });
-
-    // Desconectar observer após 15s
-    setTimeout(() => observer.disconnect(), 15000);
-
-    // Estratégia 4: Property setter (interceptar QUANDO Phantom setar window.solana)
-    let _solanaProvider: any = null;
-    let _wrappedProvider: any = null;
+  XMLHttpRequest.prototype.send = function(body?: Document | XMLHttpRequestBodyInit | null) {
+    const url = (this as any)._vetraUrl;
     
-    try {
-      Object.defineProperty(window, 'solana', {
-        get() {
-          // ✅ FIX: Retornar o provider WRAPPADO, não o original!
-          const result = _wrappedProvider || _solanaProvider;
-          console.log('🔍 Vetra Getter: Returning', result === _wrappedProvider ? 'WRAPPED ✅' : 'ORIGINAL ❌');
-          return result;
-        },
-        set(newProvider) {
-          console.log('✅ Vetra: Solana provider being set, wrapping now!');
-          
-          if (newProvider && !(window as any).__VETRA_WRAPPED__) {
-            _solanaProvider = newProvider;
-            
-            // ✅ FIX: Criar wrapper inline e salvar na variável
-            console.log('🟣 Vetra: Creating proxy wrapper for provider...');
-            
-            _wrappedProvider = new Proxy(newProvider, {
-              get(target, prop, receiver) {
-                // ✅ DEBUG: Log every property access
-                if (prop === 'signTransaction' || prop === 'signAllTransactions') {
-                  console.log(`🔍 Vetra Proxy: Accessing ${String(prop)}`);
-                }
-                
-                const original = Reflect.get(target, prop, receiver);
+    if (url && isSolanaTransaction(url, body)) {
+      console.log('🔥🔥🔥 SOLANA TRANSACTION DETECTED VIA XHR! 🔥🔥🔥');
+      console.log('📦 URL:', url);
+      console.log('📦 Body:', body);
 
-                if (prop === 'signTransaction' || prop === 'signAllTransactions') {
-                  console.log(`🎯 Vetra Proxy: Returning intercepted ${String(prop)}`);
-                  
-                  return async function (...args: any[]) {
-                    const requestId = Math.random().toString(36).substring(7);
-                    console.log('🔐 Vetra: Intercepting transaction signature request');
-                    console.log('🔐 Vetra: Transaction data:', args[0]);
-
-                    // Enviar para análise
-                    window.postMessage(
-                      {
-                        type: 'VETRA_TRANSACTION_REQUEST',
-                        id: requestId,
-                        payload: { method: prop, transaction: args[0] },
-                      },
-                      '*'
-                    );
-
-                    // Aguardar resposta do usuário
-                    const userDecision = await new Promise<{ approved: boolean }>((resolve) => {
-                      const timeout = setTimeout(() => {
-                        console.warn('⚠️ Vetra: Analysis timeout, proceeding');
-                        resolve({ approved: true });
-                      }, 30000);
-
-                      const listener = (event: MessageEvent) => {
-                        if (
-                          event.source === window &&
-                          event.data?.type === 'VETRA_TRANSACTION_RESPONSE' &&
-                          event.data?.id === requestId
-                        ) {
-                          clearTimeout(timeout);
-                          window.removeEventListener('message', listener);
-                          const response = event.data?.response || {};
-                          resolve({ approved: response.userApproved ?? true });
-                        }
-                      };
-
-                      window.addEventListener('message', listener);
-                    });
-
-                    // Bloquear se rejeitado
-                    if (!userDecision.approved) {
-                      console.log('🚫 Vetra: Transaction blocked by user');
-                      throw new Error('Transaction blocked by Vetra security analysis');
-                    }
-
-                    console.log('✅ Vetra: Transaction approved, signing...');
-                    return original.apply(target, args);
-                  };
-                }
-
-                return original;
-              },
-            });
-            
-            (window as any).__VETRA_WRAPPED__ = true;
-            clearInterval(iv);
-            observer.disconnect();
-            
-            console.log('✅ Vetra: Provider successfully wrapped via setter!');
-          } else {
-            // Já foi wrappado ou provider inválido
-            _solanaProvider = newProvider;
+      try {
+        const txData = JSON.parse(body as string);
+        
+        window.postMessage({
+          type: 'VETRA_RPC_TRANSACTION',
+          id: Math.random().toString(36).substring(7),
+          payload: {
+            url,
+            method: txData.method,
+            params: txData.params,
+            body,
           }
-        },
-        configurable: true,
-        enumerable: true
-      });
-      console.log('✅ Vetra: Property setter installed for window.solana');
-    } catch (e) {
-      console.warn('⚠️ Vetra: Could not install property setter:', e);
+        }, '*');
+
+        console.log('✅ Transaction sent to Vetra for analysis');
+      } catch (e) {
+        console.warn('⚠️ Could not parse XHR transaction body:', e);
+      }
     }
-  }
+
+    return originalXHRSend.apply(this, [body]);
+  };
+
+  console.log('✅ XMLHttpRequest interceptor installed');
+  console.log('🛡️ Vetra now monitoring all Solana RPC calls!');
 }
