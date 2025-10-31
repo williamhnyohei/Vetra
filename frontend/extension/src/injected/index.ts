@@ -204,19 +204,30 @@ if ((window as any).__VETRA_INJECTED__) {
       },
     });
 
-    // tenta trocar o window.solana sem quebrar sites
+    // ✅ FIX: NÃO sobrescrever se property setter já está ativo!
+    // Se window.solana já tem um getter/setter customizado, não mexer!
+    const descriptor = Object.getOwnPropertyDescriptor(window, 'solana');
+    const hasCustomSetter = descriptor && (descriptor.get || descriptor.set);
+    
+    if (hasCustomSetter) {
+      console.log('🟣 Vetra: Skipping defineProperty (custom setter already active)');
+      // Property setter já está gerenciando, não sobrescrever!
+      return;
+    }
+
+    // tenta trocar o window.solana sem quebrar sites (se não tiver setter customizado)
     try {
       Object.defineProperty(window, 'solana', {
         value: wrappedSolana,
         writable: false,
         configurable: true,
       });
+      console.log('🟣 Vetra injected: provider wrapped via defineProperty!');
     } catch {
       // fallback
       (window as any).solana = wrappedSolana;
+      console.log('🟣 Vetra injected: provider wrapped via assignment!');
     }
-
-    console.log('🟣 Vetra injected: provider wrapped!');
   }
 
   /**
@@ -284,7 +295,9 @@ if ((window as any).__VETRA_INJECTED__) {
       Object.defineProperty(window, 'solana', {
         get() {
           // ✅ FIX: Retornar o provider WRAPPADO, não o original!
-          return _wrappedProvider || _solanaProvider;
+          const result = _wrappedProvider || _solanaProvider;
+          console.log('🔍 Vetra Getter: Returning', result === _wrappedProvider ? 'WRAPPED ✅' : 'ORIGINAL ❌');
+          return result;
         },
         set(newProvider) {
           console.log('✅ Vetra: Solana provider being set, wrapping now!');
@@ -297,12 +310,20 @@ if ((window as any).__VETRA_INJECTED__) {
             
             _wrappedProvider = new Proxy(newProvider, {
               get(target, prop, receiver) {
+                // ✅ DEBUG: Log every property access
+                if (prop === 'signTransaction' || prop === 'signAllTransactions') {
+                  console.log(`🔍 Vetra Proxy: Accessing ${String(prop)}`);
+                }
+                
                 const original = Reflect.get(target, prop, receiver);
 
                 if (prop === 'signTransaction' || prop === 'signAllTransactions') {
+                  console.log(`🎯 Vetra Proxy: Returning intercepted ${String(prop)}`);
+                  
                   return async function (...args: any[]) {
                     const requestId = Math.random().toString(36).substring(7);
                     console.log('🔐 Vetra: Intercepting transaction signature request');
+                    console.log('🔐 Vetra: Transaction data:', args[0]);
 
                     // Enviar para análise
                     window.postMessage(

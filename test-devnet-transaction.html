@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vetra - Test Devnet Transaction</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .status {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 15px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+
+        .info-box strong {
+            color: #667eea;
+        }
+
+        .logs {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+
+        .log-line {
+            margin-bottom: 5px;
+        }
+
+        .log-success { color: #4ec9b0; }
+        .log-error { color: #f48771; }
+        .log-warning { color: #ce9178; }
+        .log-info { color: #9cdcfe; }
+
+        .network-badge {
+            display: inline-block;
+            background: #28a745;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛡️ Vetra Test</h1>
+        <p class="subtitle">Teste de Interceptação de Transações - Solana Devnet</p>
+        
+        <span class="network-badge">🌐 DEVNET</span>
+
+        <div class="info-box">
+            <strong>📋 Como funciona:</strong><br>
+            1. Conecte sua carteira Phantom (em modo Devnet)<br>
+            2. Clique em "Enviar Transação de Teste"<br>
+            3. Vetra deve interceptar e mostrar popup de análise<br>
+            4. Veja os logs abaixo para debugging
+        </div>
+
+        <div id="status" class="status">
+            ⏳ Aguardando conexão da carteira...
+        </div>
+
+        <button id="connectBtn" onclick="connectWallet()">
+            🔌 Conectar Phantom Wallet
+        </button>
+
+        <button id="sendBtn" onclick="sendTestTransaction()" disabled>
+            🚀 Enviar Transação de Teste (0.01 SOL)
+        </button>
+
+        <button onclick="clearLogs()">
+            🗑️ Limpar Logs
+        </button>
+
+        <div class="logs" id="logs"></div>
+    </div>
+
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <script>
+        const DEVNET_RPC = 'https://supertea-solanan-66b1.devnet.rpcpool.com/d914275f-7a7d-491c-9f0e-61cb6466f39a';
+        const connection = new solanaWeb3.Connection(DEVNET_RPC, 'confirmed');
+        
+        let walletPublicKey = null;
+
+        function log(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const logClass = `log-${type}`;
+            
+            const logLine = document.createElement('div');
+            logLine.className = `log-line ${logClass}`;
+            logLine.textContent = `[${timestamp}] ${message}`;
+            
+            logsDiv.appendChild(logLine);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+            
+            console.log(message);
+        }
+
+        function setStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+            log('Logs cleared', 'info');
+        }
+
+        async function connectWallet() {
+            try {
+                log('🔌 Tentando conectar ao Phantom...', 'info');
+                setStatus('🔌 Conectando ao Phantom...', 'info');
+
+                if (!window.solana) {
+                    throw new Error('Phantom Wallet não encontrado! Instale a extensão Phantom.');
+                }
+
+                log('✅ window.solana detectado', 'success');
+                log(`📦 isPhantom: ${window.solana.isPhantom}`, 'info');
+                log(`📦 publicKey: ${window.solana.publicKey?.toString() || 'não conectado'}`, 'info');
+
+                const resp = await window.solana.connect();
+                walletPublicKey = resp.publicKey;
+
+                log(`✅ Conectado ao Phantom!`, 'success');
+                log(`🔑 Public Key: ${walletPublicKey.toString()}`, 'success');
+                
+                setStatus(`✅ Conectado: ${walletPublicKey.toString().substring(0, 8)}...`, 'success');
+                
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('sendBtn').disabled = false;
+
+                // Verificar saldo
+                const balance = await connection.getBalance(walletPublicKey);
+                const balanceSOL = balance / solanaWeb3.LAMPORTS_PER_SOL;
+                log(`💰 Saldo: ${balanceSOL.toFixed(4)} SOL`, 'info');
+
+                if (balanceSOL < 0.01) {
+                    log('⚠️ Saldo baixo! Faça airdrop: solana airdrop 2', 'warning');
+                    setStatus('⚠️ Saldo baixo na Devnet! Faça airdrop primeiro.', 'error');
+                }
+
+            } catch (error) {
+                log(`❌ Erro ao conectar: ${error.message}`, 'error');
+                setStatus(`❌ Erro: ${error.message}`, 'error');
+            }
+        }
+
+        async function sendTestTransaction() {
+            try {
+                log('🚀 Iniciando transação de teste...', 'info');
+                setStatus('🚀 Criando transação...', 'info');
+
+                if (!walletPublicKey) {
+                    throw new Error('Carteira não conectada!');
+                }
+
+                // Criar endereço de destino aleatório
+                const destPubkey = solanaWeb3.Keypair.generate().publicKey;
+                log(`📤 Origem: ${walletPublicKey.toString()}`, 'info');
+                log(`📥 Destino: ${destPubkey.toString()}`, 'info');
+                log(`💰 Valor: 0.01 SOL (10000000 lamports)`, 'info');
+
+                // Criar transação de transferência
+                const transaction = new solanaWeb3.Transaction().add(
+                    solanaWeb3.SystemProgram.transfer({
+                        fromPubkey: walletPublicKey,
+                        toPubkey: destPubkey,
+                        lamports: 10000000, // 0.01 SOL
+                    })
+                );
+
+                // Pegar blockhash recente
+                log('🔗 Obtendo blockhash da Devnet...', 'info');
+                const { blockhash } = await connection.getLatestBlockhash();
+                transaction.recentBlockhash = blockhash;
+                transaction.feePayer = walletPublicKey;
+
+                log('✅ Transação criada com sucesso', 'success');
+                log('📝 Instruções na transação: ' + transaction.instructions.length, 'info');
+                
+                // ========================================
+                // 🔥 MOMENTO CRÍTICO: VETRA DEVE INTERCEPTAR AQUI!
+                // ========================================
+                log('⚠️ CHAMANDO window.solana.signTransaction()...', 'warning');
+                log('🛡️ VETRA DEVE INTERCEPTAR AGORA!', 'warning');
+                setStatus('🛡️ Vetra deve interceptar a transação agora...', 'info');
+
+                const signedTransaction = await window.solana.signTransaction(transaction);
+
+                log('✅ Transação assinada!', 'success');
+                log('📝 Signature length: ' + signedTransaction.signatures.length, 'info');
+
+                // Enviar para a blockchain
+                log('📤 Enviando transação para Devnet...', 'info');
+                const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+
+                log(`✅ Transação enviada!`, 'success');
+                log(`🔗 Signature: ${signature}`, 'success');
+                log(`🌐 Ver em: https://solscan.io/tx/${signature}?cluster=devnet`, 'info');
+
+                setStatus(`✅ Transação enviada! Signature: ${signature.substring(0, 8)}...`, 'success');
+
+                // Aguardar confirmação
+                log('⏳ Aguardando confirmação...', 'info');
+                const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+                
+                if (confirmation.value.err) {
+                    log(`❌ Transação falhou: ${confirmation.value.err}`, 'error');
+                } else {
+                    log(`✅ Transação confirmada!`, 'success');
+                }
+
+            } catch (error) {
+                log(`❌ Erro: ${error.message}`, 'error');
+                setStatus(`❌ Erro: ${error.message}`, 'error');
+                
+                if (error.message.includes('Vetra')) {
+                    log('🛡️ SUCESSO! Vetra bloqueou a transação!', 'success');
+                    setStatus('🛡️ Vetra interceptou e bloqueou a transação!', 'success');
+                }
+            }
+        }
+
+        // Log inicial
+        window.addEventListener('load', () => {
+            log('🌐 Página carregada', 'info');
+            log(`📍 RPC Devnet: ${DEVNET_RPC}`, 'info');
+            log('⏳ Aguardando conexão da carteira...', 'info');
+            
+            // Verificar se Phantom está instalado
+            setTimeout(() => {
+                if (window.solana) {
+                    log('✅ Phantom detectado!', 'success');
+                    log(`📦 isPhantom: ${window.solana.isPhantom}`, 'info');
+                } else {
+                    log('❌ Phantom não encontrado!', 'error');
+                    setStatus('❌ Instale a extensão Phantom Wallet', 'error');
+                }
+            }, 1000);
+        });
+
+        // Detectar mudanças no window.solana (para debugging)
+        let checkCount = 0;
+        const checkInterval = setInterval(() => {
+            checkCount++;
+            if (window.solana) {
+                console.log(`[Check ${checkCount}] window.solana existe:`, window.solana);
+            } else {
+                console.log(`[Check ${checkCount}] window.solana ainda não existe`);
+            }
+            
+            if (checkCount >= 20) {
+                clearInterval(checkInterval);
+            }
+        }, 500);
+    </script>
+</body>
+</html>
+
