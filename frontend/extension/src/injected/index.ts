@@ -278,23 +278,88 @@ if ((window as any).__VETRA_INJECTED__) {
 
     // Estratégia 4: Property setter (interceptar QUANDO Phantom setar window.solana)
     let _solanaProvider: any = null;
+    let _wrappedProvider: any = null;
+    
     try {
       Object.defineProperty(window, 'solana', {
         get() {
-          return _solanaProvider;
+          // ✅ FIX: Retornar o provider WRAPPADO, não o original!
+          return _wrappedProvider || _solanaProvider;
         },
         set(newProvider) {
           console.log('✅ Vetra: Solana provider being set, wrapping now!');
-          _solanaProvider = newProvider;
           
           if (newProvider && !(window as any).__VETRA_WRAPPED__) {
-            // Aguardar próximo tick para Phantom terminar inicialização
-            setTimeout(() => {
-              wrapSolanaProvider(newProvider);
-              (window as any).__VETRA_WRAPPED__ = true;
-              clearInterval(iv);
-              observer.disconnect();
-            }, 50);
+            _solanaProvider = newProvider;
+            
+            // ✅ FIX: Criar wrapper inline e salvar na variável
+            console.log('🟣 Vetra: Creating proxy wrapper for provider...');
+            
+            _wrappedProvider = new Proxy(newProvider, {
+              get(target, prop, receiver) {
+                const original = Reflect.get(target, prop, receiver);
+
+                if (prop === 'signTransaction' || prop === 'signAllTransactions') {
+                  return async function (...args: any[]) {
+                    const requestId = Math.random().toString(36).substring(7);
+                    console.log('🔐 Vetra: Intercepting transaction signature request');
+
+                    // Enviar para análise
+                    window.postMessage(
+                      {
+                        type: 'VETRA_TRANSACTION_REQUEST',
+                        id: requestId,
+                        payload: { method: prop, transaction: args[0] },
+                      },
+                      '*'
+                    );
+
+                    // Aguardar resposta do usuário
+                    const userDecision = await new Promise<{ approved: boolean }>((resolve) => {
+                      const timeout = setTimeout(() => {
+                        console.warn('⚠️ Vetra: Analysis timeout, proceeding');
+                        resolve({ approved: true });
+                      }, 30000);
+
+                      const listener = (event: MessageEvent) => {
+                        if (
+                          event.source === window &&
+                          event.data?.type === 'VETRA_TRANSACTION_RESPONSE' &&
+                          event.data?.id === requestId
+                        ) {
+                          clearTimeout(timeout);
+                          window.removeEventListener('message', listener);
+                          const response = event.data?.response || {};
+                          resolve({ approved: response.userApproved ?? true });
+                        }
+                      };
+
+                      window.addEventListener('message', listener);
+                    });
+
+                    // Bloquear se rejeitado
+                    if (!userDecision.approved) {
+                      console.log('🚫 Vetra: Transaction blocked by user');
+                      throw new Error('Transaction blocked by Vetra security analysis');
+                    }
+
+                    console.log('✅ Vetra: Transaction approved, signing...');
+                    return original.apply(target, args);
+                  };
+                }
+
+                return original;
+              },
+            });
+            
+            (window as any).__VETRA_WRAPPED__ = true;
+            clearInterval(iv);
+            observer.disconnect();
+            
+            console.log('✅ Vetra: Provider successfully wrapped via setter!');
+          } else {
+            // Já foi wrappado ou provider inválido
+            _solanaProvider = newProvider;
           }
         },
         configurable: true,
