@@ -1,0 +1,26 @@
+# VETRA Multi-Agent System - Python Dependencies
+
+# FastAPI and Web Server
+fastapi==0.115.6
+uvicorn==0.34.0
+python-dotenv==1.0.1
+pydantic==2.10.5
+
+# LangChain and LangGraph
+langchain==0.3.17
+langchain-core==0.3.33
+langchain-google-genai==2.0.8
+langgraph==0.2.59
+
+# Google Gemini AI
+google-generativeai==0.8.3
+
+# HTTP Client
+httpx==0.28.1
+
+# Data Processing
+python-multipart==0.0.20
+
+# Logging
+colorlog==6.9.0
+

@@ -16,6 +16,11 @@ web_modules/
 .env.test.local
 .env.production.local
 
+# Allow specific .env files for deployment
+!frontend/extension/.env.development
+!frontend/extension/.env.production
+!vetra_mas/.env.example
+
 # Build outputs
 dist/
 build/
@@ -188,7 +193,7 @@ Cargo.lock
 # Python
 vetra/
 venv/
-env/
+# env/  # Commented to allow vetra_mas/env
 ENV/
 __pycache__/
 *.py[cod]
