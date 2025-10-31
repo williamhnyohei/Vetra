@@ -229,25 +229,80 @@ if ((window as any).__VETRA_INJECTED__) {
       (window as any).backpack ||
       (window as any).solflare;
 
-    if (prov) {
+    if (prov && !(window as any).__VETRA_WRAPPED__) {
       wrapSolanaProvider(prov);
+      (window as any).__VETRA_WRAPPED__ = true;
       return true;
     }
     return false;
   };
 
+  // ✅ FIX: Usar múltiplas estratégias para interceptar Phantom
+
+  // Estratégia 1: Tentar imediatamente
   if (!tryWrap()) {
-    // não tinha ainda → ficar olhando por ~5s
+    console.log('🟣 Vetra: Provider not found yet, setting up detection...');
+
+    // Estratégia 2: Polling (tentar a cada 100ms por 10s)
     let attempts = 0;
-    const maxAttempts = 50;
+    const maxAttempts = 100; // 10 segundos
     const iv = setInterval(() => {
       attempts++;
       if (tryWrap()) {
+        console.log('✅ Vetra: Provider found via polling!');
         clearInterval(iv);
       } else if (attempts >= maxAttempts) {
         clearInterval(iv);
-        console.warn('⚠️ Vetra injected: no Solana provider found after 5s');
+        console.warn('⚠️ Vetra injected: no Solana provider found after 10s');
       }
     }, 100);
+
+    // Estratégia 3: MutationObserver (detectar quando window.solana é adicionado)
+    const observer = new MutationObserver(() => {
+      if ((window as any).solana && !(window as any).__VETRA_WRAPPED__) {
+        console.log('✅ Vetra: Provider detected via MutationObserver!');
+        tryWrap();
+        observer.disconnect();
+        clearInterval(iv);
+      }
+    });
+
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: false
+    });
+
+    // Desconectar observer após 15s
+    setTimeout(() => observer.disconnect(), 15000);
+
+    // Estratégia 4: Property setter (interceptar QUANDO Phantom setar window.solana)
+    let _solanaProvider: any = null;
+    try {
+      Object.defineProperty(window, 'solana', {
+        get() {
+          return _solanaProvider;
+        },
+        set(newProvider) {
+          console.log('✅ Vetra: Solana provider being set, wrapping now!');
+          _solanaProvider = newProvider;
+          
+          if (newProvider && !(window as any).__VETRA_WRAPPED__) {
+            // Aguardar próximo tick para Phantom terminar inicialização
+            setTimeout(() => {
+              wrapSolanaProvider(newProvider);
+              (window as any).__VETRA_WRAPPED__ = true;
+              clearInterval(iv);
+              observer.disconnect();
+            }, 50);
+          }
+        },
+        configurable: true,
+        enumerable: true
+      });
+      console.log('✅ Vetra: Property setter installed for window.solana');
+    } catch (e) {
+      console.warn('⚠️ Vetra: Could not install property setter:', e);
+    }
   }
 }

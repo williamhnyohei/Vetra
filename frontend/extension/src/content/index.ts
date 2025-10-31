@@ -3,14 +3,41 @@
 // Content Script — roda em todas as páginas
 console.log('🟢 Vetra content script loaded at', window.location.href);
 
-// 1) pede pro background injetar o script no contexto da página
-chrome.runtime.sendMessage({ type: 'INJECT_PAGE_SCRIPT' }, (res) => {
-  if (!res?.ok) {
-    console.error('❌ Failed to inject via scripting:', res?.error);
-  } else {
-    console.log('✅ Injected via chrome.scripting');
+// ✅ FIX: Verificar se é uma página válida antes de injetar
+const isValidPage = (): boolean => {
+  const url = window.location.href;
+  const invalidPrefixes = [
+    'chrome://',
+    'chrome-extension://',
+    'about:',
+    'edge://',
+    'brave://',
+    'moz-extension://'
+  ];
+  
+  for (const prefix of invalidPrefixes) {
+    if (url.startsWith(prefix)) {
+      console.log('⏭️ Vetra: Skipping injection on system page:', prefix);
+      return false;
+    }
   }
-});
+  
+  return true;
+};
+
+// Only inject on valid web pages
+if (!isValidPage()) {
+  console.log('⏭️ Vetra: Content script loaded but not injecting (system page)');
+} else {
+  // 1) pede pro background injetar o script no contexto da página
+  chrome.runtime.sendMessage({ type: 'INJECT_PAGE_SCRIPT' }, (res) => {
+    if (!res?.ok) {
+      console.error('❌ Failed to inject via scripting:', res?.error);
+    } else {
+      console.log('✅ Injected via chrome.scripting');
+    }
+  });
+}
 
 // 2) Bridge: POPUP → CONTENT → INJECTED (conectar carteira)
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
