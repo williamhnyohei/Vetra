@@ -3,7 +3,6 @@
 // Content Script — roda em todas as páginas
 console.log('🟢 Vetra content script loaded at', window.location.href);
 
-// ✅ FIX: Verificar se é uma página válida antes de injetar
 const isValidPage = (): boolean => {
   const url = window.location.href;
   const invalidPrefixes = [
@@ -12,101 +11,196 @@ const isValidPage = (): boolean => {
     'about:',
     'edge://',
     'brave://',
-    'moz-extension://'
+    'moz-extension://',
   ];
-  
+
   for (const prefix of invalidPrefixes) {
     if (url.startsWith(prefix)) {
       console.log('⏭️ Vetra: Skipping injection on system page:', prefix);
       return false;
     }
   }
-  
+
   return true;
 };
 
-// Only inject on valid web pages
+/** Normaliza tipos legados e o contrato atual para um único fluxo de bridge. */
+function normalizeTransactionMessage(data: any): {
+  id: string;
+  payload: { method: string; transaction: unknown };
+} | null {
+  if (!data || typeof data !== 'object') return null;
+
+  if (data.type === 'VETRA_TRANSACTION_REQUEST' && data.payload && data.id) {
+    return {
+      id: String(data.id),
+      payload: {
+        method: String(data.payload.method ?? 'signTransaction'),
+        transaction: data.payload.transaction,
+      },
+    };
+  }
+
+  if (
+    data.type === 'VETRA_TX_INTERCEPTED' ||
+    data.type === 'VETRA_TRANSACTION_INTERCEPTED'
+  ) {
+    return {
+      id:
+        typeof data.id === 'string' && data.id.length > 0
+          ? data.id
+          : Math.random().toString(36).slice(2),
+      payload: {
+        method: String(data.method ?? 'signTransaction'),
+        transaction: data.transaction,
+      },
+    };
+  }
+
+  return null;
+}
+
+async function bridgeTransactionToBackground(normalized: {
+  id: string;
+  payload: { method: string; transaction: unknown };
+}): Promise<void> {
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: 'ANALYZE_TRANSACTION',
+      payload: normalized.payload,
+    });
+
+    window.postMessage(
+      {
+        type: 'VETRA_TRANSACTION_RESPONSE',
+        id: normalized.id,
+        response,
+      },
+      '*'
+    );
+  } catch (error) {
+    console.error('❌ Vetra content: bridge ANALYZE_TRANSACTION failed', error);
+    window.postMessage(
+      {
+        type: 'VETRA_TRANSACTION_RESPONSE',
+        id: normalized.id,
+        response: {
+          success: false,
+          error: String((error as Error)?.message || error),
+          riskLevel: 'medium',
+          riskScore: 50,
+        },
+      },
+      '*'
+    );
+  }
+}
+
 if (!isValidPage()) {
   console.log('⏭️ Vetra: Content script loaded but not injecting (system page)');
 } else {
-  // ✅ ULTRA-FAST INJECTION: Inject code as inline string (faster than loading file)
-  console.log('🔥 VETRA: Injecting interceptor INLINE (fastest method)...');
-  
+  console.log('🔥 VETRA: Injecting interceptor INLINE (document_start)...');
+
   const inlineCode = `
 (function() {
-  console.log('🔥 VETRA INLINE: Running BEFORE Phantom loads...');
-  
+  console.log('🔥 VETRA INLINE: early hook');
   if (window.__VETRA_INTERCEPTOR__) return;
   window.__VETRA_INTERCEPTOR__ = true;
-  
-  let _wrapped = null;
-  let _original = null;
-  
+
+  var _wrapped = null;
+  var _stored = null;
+
+  function randomId() {
+    return Math.random().toString(36).substring(2, 11);
+  }
+
+  function postTx(method, tx) {
+    window.postMessage({
+      type: 'VETRA_TRANSACTION_REQUEST',
+      id: randomId(),
+      payload: { method: String(method), transaction: tx }
+    }, '*');
+  }
+
+  function tryPatchSolanaMethods() {
+    var s = window.solana;
+    if (!s || typeof s.signTransaction !== 'function') return false;
+    if (s.__vetra_method_patched) return true;
+    var methods = ['signTransaction', 'signAllTransactions', 'signAndSendTransaction'];
+    for (var i = 0; i < methods.length; i++) {
+      var m = methods[i];
+      var orig = s[m];
+      if (typeof orig !== 'function') continue;
+      (function(methodName, original) {
+        s[methodName] = async function() {
+          var args = Array.prototype.slice.call(arguments);
+          postTx(methodName, args[0]);
+          return original.apply(s, args);
+        };
+      })(m, orig);
+    }
+    try { s.__vetra_method_patched = true; } catch (e1) {}
+    try { window.__VETRA_HOOK__ = 'late_patched'; } catch (e2) {}
+    return true;
+  }
+
   try {
     Object.defineProperty(window, 'solana', {
-      get() {
-        return _wrapped || _original;
+      get: function() {
+        return _wrapped || _stored;
       },
-      set(provider) {
-        console.log('🔥🔥🔥 PHANTOM SETTING window.solana! INTERCEPTING NOW! 🔥🔥🔥');
-        _original = provider;
-        
-        if (!provider) return;
-        
+      set: function(provider) {
+        _stored = provider;
+        if (!provider) { _wrapped = null; return; }
         _wrapped = new Proxy(provider, {
-          get(target, prop) {
-            const orig = target[prop];
-            
+          get: function(target, prop) {
+            var orig = target[prop];
             if (prop === 'signTransaction' || prop === 'signAllTransactions' || prop === 'signAndSendTransaction') {
-              console.log(\`🎯 VETRA PROXY: Accessing \${prop}\`);
-              return async function(...args) {
-                console.log('🔐🔐🔐 VETRA: TRANSACTION INTERCEPTED! 🔐🔐🔐');
-                console.log('Method:', prop);
-                console.log('Transaction:', args[0]);
-                
-                window.postMessage({
-                  type: 'VETRA_TX_INTERCEPTED',
-                  method: prop,
-                  transaction: args[0]
-                }, '*');
-                
-                // Allow for now
+              if (typeof orig !== 'function') return orig;
+              return async function() {
+                var args = Array.prototype.slice.call(arguments);
+                postTx(prop, args[0]);
                 return orig.apply(target, args);
               };
             }
-            
             return orig;
           }
         });
-        
-        console.log('✅✅✅ VETRA: Proxy created! All transactions will be intercepted! ✅✅✅');
       },
       configurable: true,
       enumerable: true
     });
-    
-    console.log('✅ VETRA: Property setter installed! Waiting for Phantom...');
+    try { window.__VETRA_HOOK__ = 'installed'; } catch (e) {}
+    console.log('✅ VETRA INLINE: solana setter installed');
   } catch (e) {
-    console.error('❌ VETRA: Failed to install setter:', e);
+    console.error('❌ VETRA INLINE: defineProperty failed', e);
+    try { window.__VETRA_HOOK__ = 'failed'; window.__VETRA_HOOK_DETAIL__ = String(e && e.message || e); } catch (e2) {}
   }
+
+  var deadline = Date.now() + 10000;
+  function tick() {
+    try {
+      if (window.__VETRA_HOOK__ === 'failed' && window.solana) {
+        if (tryPatchSolanaMethods()) return;
+      }
+    } catch (e3) {}
+    if (Date.now() < deadline) setTimeout(tick, 250);
+  }
+  setTimeout(tick, 0);
 })();
   `;
 
   const script = document.createElement('script');
   script.textContent = inlineCode;
   script.id = 'vetra-interceptor';
-  
-  // Inject IMMEDIATELY at the START of documentElement
+
   (document.documentElement || document.head || document.body || document).prepend(script);
-  
-  console.log('✅ VETRA: Inline script injected at START of page!');
+
+  console.log('✅ VETRA: Inline script injected');
 }
 
-// 2) Bridge: POPUP → CONTENT → INJECTED (conectar carteira)
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  // aceitamos os dois tipos que você já usou no popup
   if (msg?.type === 'VETRA_CONNECT' || msg?.type === 'VETRA_CONNECT_WALLET') {
-    // pode vir do popup como {payload: {provider: 'phantom' | 'backpack' | 'solflare' | 'auto'}}
     const provider =
       (msg?.payload?.provider as
         | 'phantom'
@@ -115,23 +209,19 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         | 'auto'
         | undefined) || 'auto';
 
-    // id pra parear req/res
     const id =
-      (crypto as any)?.randomUUID?.() ||
-      Math.random().toString(36).slice(2);
+      (crypto as any)?.randomUUID?.() || Math.random().toString(36).slice(2);
 
     const handler = (ev: MessageEvent) => {
       const data = ev.data || {};
       if (data?.type === 'VETRA_CONNECT_RES' && data.id === id) {
         window.removeEventListener('message', handler);
-        // devolve pro popup exatamente o que o injected mandou
         sendResponse(data);
       }
     };
 
     window.addEventListener('message', handler);
 
-    // manda pro contexto da página (injected.js vai ouvir isso)
     window.postMessage(
       {
         type: 'VETRA_CONNECT',
@@ -141,57 +231,39 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       '*'
     );
 
-    // importante: manter o canal aberto pq a resposta vem depois
     return true;
   }
 });
 
-// 3) Bridge: INJECTED → CONTENT → BACKGROUND (analisar transação)
-window.addEventListener('message', async (event) => {
+window.addEventListener('message', (event) => {
   if (event.source !== window) return;
-  const message = event.data;
-
-  // Handle wallet signTransaction interception
-  if (message?.type === 'VETRA_TRANSACTION_REQUEST') {
-    const response = await chrome.runtime.sendMessage({
-      type: 'ANALYZE_TRANSACTION',
-      payload: message.payload,
-    });
-
-    window.postMessage(
-      {
-        type: 'VETRA_TRANSACTION_RESPONSE',
-        id: message.id,
-        response,
-      },
-      '*'
-    );
+  const normalized = normalizeTransactionMessage(event.data);
+  if (normalized) {
+    void bridgeTransactionToBackground(normalized);
+    return;
   }
 
-  // 🔥 Handle RPC transaction interception (network level)
-  if (message?.type === 'VETRA_RPC_TRANSACTION') {
-    console.log('🔥 Content: RPC transaction detected, forwarding to background...');
-    
-    try {
-      const response = await chrome.runtime.sendMessage({
-        type: 'ANALYZE_RPC_TRANSACTION',
-        payload: message.payload,
-      });
+  if (event.data?.type === 'VETRA_RPC_TRANSACTION') {
+    void (async () => {
+      console.log('🔥 Vetra content: RPC transaction — forwarding to background');
+      try {
+        const response = await chrome.runtime.sendMessage({
+          type: 'ANALYZE_RPC_TRANSACTION',
+          payload: event.data.payload,
+        });
 
-      console.log('✅ Content: RPC analysis complete:', response);
-
-      // Send response back to injected script
-      window.postMessage(
-        {
-          type: 'VETRA_RPC_ANALYSIS_COMPLETE',
-          id: message.id,
-          analysis: response,
-        },
-        '*'
-      );
-    } catch (error) {
-      console.error('❌ Content: Error analyzing RPC transaction:', error);
-    }
+        window.postMessage(
+          {
+            type: 'VETRA_RPC_ANALYSIS_COMPLETE',
+            id: event.data.id,
+            analysis: response,
+          },
+          '*'
+        );
+      } catch (error) {
+        console.error('❌ Vetra content: RPC analysis error', error);
+      }
+    })();
   }
 });
 

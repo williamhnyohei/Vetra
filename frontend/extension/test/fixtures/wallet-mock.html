@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Vetra fixture — mock wallet</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 40rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      button {
+        padding: 0.5rem 1rem;
+        font-size: 1rem;
+        cursor: pointer;
+      }
+      pre {
+        background: #f4f4f5;
+        padding: 1rem;
+        overflow: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Vetra — fixture de carteira mock</h1>
+    <p>
+      Esta página atribui <code>window.solana</code> após um pequeno atraso para exercitar o setter do Vetra.
+      Sirva a pasta <code>test/fixtures</code> em HTTP (porta 8765 no Playwright).
+    </p>
+    <button type="button" id="sign">Sign mock</button>
+    <p id="status"></p>
+    <pre id="hook"></pre>
+    <script>
+      window.__signCalls = 0;
+      document.getElementById('sign').addEventListener('click', async function () {
+        var p = window.solana;
+        if (!p || typeof p.signTransaction !== 'function') {
+          document.getElementById('status').textContent = 'sem window.solana';
+          return;
+        }
+        try {
+          await p.signTransaction({ mock: true });
+          document.getElementById('status').textContent =
+            'signTransaction ok (__signCalls=' + window.__signCalls + ')';
+        } catch (e) {
+          document.getElementById('status').textContent = String(e);
+        }
+        document.getElementById('hook').textContent = JSON.stringify(
+          {
+            __VETRA_HOOK__: window.__VETRA_HOOK__,
+            __VETRA_HOOK_DETAIL__: window.__VETRA_HOOK_DETAIL__,
+            __signCalls: window.__signCalls,
+          },
+          null,
+          2
+        );
+      });
+      setTimeout(function () {
+        window.solana = {
+          isPhantom: true,
+          signTransaction: async function (tx) {
+            window.__signCalls++;
+            return tx;
+          },
+        };
+      }, 80);
+    </script>
+  </body>
+</html>

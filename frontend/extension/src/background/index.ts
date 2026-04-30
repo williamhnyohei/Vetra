@@ -38,9 +38,65 @@ chrome.runtime.onStartup?.addListener(() => {
   initializeServices();
 });
 
+async function notifyHighRisk(result: {
+  riskLevel?: string;
+  riskScore?: number;
+  reasons?: string[];
+}): Promise<void> {
+  const payload = {
+    title: 'Vetra: alto risco detectado',
+    riskLevel: result.riskLevel,
+    riskScore: result.riskScore,
+    reasons: Array.isArray(result.reasons) ? result.reasons.slice(0, 8) : [],
+    ts: Date.now(),
+  };
+
+  try {
+    await chrome.storage.session.set({ vetraPendingAlert: payload });
+  } catch (e) {
+    console.warn('⚠️ vetraPendingAlert session write failed:', e);
+  }
+
+  try {
+    await chrome.windows.create({
+      url: chrome.runtime.getURL('alert.html'),
+      type: 'popup',
+      width: 440,
+      height: 380,
+      focused: true,
+    });
+    return;
+  } catch (e) {
+    console.warn('⚠️ windows.create for alert failed:', e);
+  }
+
+  try {
+    await chrome.notifications.create('vetra-high-risk', {
+      type: 'basic',
+      iconUrl: chrome.runtime.getURL('icons/icon-128.png'),
+      title: 'Vetra — alto risco',
+      message:
+        (payload.reasons && payload.reasons[0]) ||
+        'Revise a transação antes de assinar.',
+    });
+  } catch (e) {
+    console.warn('⚠️ notifications.create failed:', e);
+  }
+}
+
 // Listen for messages from content script
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  // console.debug('Background received message:', message?.type);
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === 'INJECT_PAGE_SCRIPT' && sender.tab?.id) {
+    chrome.scripting
+      .executeScript({
+        target: { tabId: sender.tab.id },
+        files: ['injected.js'],
+        world: 'MAIN',
+      })
+      .then(() => sendResponse({ ok: true }))
+      .catch((e) => sendResponse({ ok: false, error: String(e) }));
+    return true;
+  }
 
   if (message?.type === 'ANALYZE_TRANSACTION') {
     handleTransactionAnalysis(message.payload)
@@ -52,10 +108,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           error: error?.message || String(error),
         });
       });
-    return true; // Keep channel open (async)
+    return true;
   }
 
-  // 🔥 Handle RPC transaction interception
   if (message?.type === 'ANALYZE_RPC_TRANSACTION') {
     console.log('🔥 Background: RPC transaction received, analyzing...');
     handleRPCTransactionAnalysis(message.payload)
@@ -67,7 +122,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           error: error?.message || String(error),
         });
       });
-    return true; // Keep channel open (async)
+    return true;
   }
 
   if (message?.type === 'GET_ATTESTATIONS') {
@@ -81,7 +136,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           attestations: [],
         });
       });
-    return true; // Keep channel open (async)
+    return true;
   }
 
   return false;
@@ -151,13 +206,17 @@ async function handleTransactionAnalysis(payload: any) {
       parsedTransaction: parsedTx,
     };
 
-    // Se for alto risco, tentar abrir popup (best-effort)
     if (result.riskLevel === 'high') {
       console.log('⚠️ HIGH RISK detected! Attempting to open popup…');
       try {
         await chrome.action.openPopup();
       } catch (error) {
         console.warn('⚠️ Could not open popup automatically:', error);
+        await notifyHighRisk({
+          riskLevel: result.riskLevel,
+          riskScore: result.riskScore,
+          reasons: result.reasons,
+        });
       }
     }
 
@@ -211,11 +270,27 @@ async function handleRPCTransactionAnalysis(payload: any) {
 
     console.log('✅ RPC transaction analyzed:', analysisResponse);
 
+    const level = analysisResponse?.analysis?.level;
+    const score = analysisResponse?.analysis?.score;
+    const reasons = analysisResponse?.analysis?.reasons;
+
+    if (level === 'high') {
+      try {
+        await chrome.action.openPopup();
+      } catch {
+        await notifyHighRisk({
+          riskLevel: level,
+          riskScore: score,
+          reasons,
+        });
+      }
+    }
+
     return {
       success: true,
       analysis: analysisResponse?.analysis,
-      riskLevel: analysisResponse?.analysis?.level,
-      riskScore: analysisResponse?.analysis?.score,
+      riskLevel: level,
+      riskScore: score,
     };
 
   } catch (error: any) {
@@ -308,19 +383,6 @@ function reconstructTransaction(transactionData: any): Transaction {
 // Install/Update hooks
 chrome.runtime.onInstalled.addListener((details) => {
   console.log('🧩 Vetra extension installed/updated:', details?.reason);
-});
-
-// background/index.ts
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg?.type === 'INJECT_PAGE_SCRIPT' && sender.tab?.id) {
-    chrome.scripting.executeScript({
-      target: { tabId: sender.tab.id },
-      files: ['injected.js'],
-      world: 'MAIN', // roda no contexto da página; não sofre CSP
-    }).then(() => sendResponse({ ok: true }))
-      .catch((e) => sendResponse({ ok: false, error: String(e) }));
-    return true;
-  }
 });
 
 export {};
