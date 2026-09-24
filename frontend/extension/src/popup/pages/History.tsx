@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ApiService from '../../services/api-service';
+import { useAuthStore } from '../../store/auth-store';
 
 interface HistoryProps {
   onBack?: () => void;
@@ -8,22 +9,45 @@ interface HistoryProps {
 
 const History: React.FC<HistoryProps> = ({ onBack, onNavigateToPlans }) => {
   const [currentPage, setCurrentPage] = useState(1);
-  const [isFreePlan] = useState(true); // Simulate Free plan
+  const [plan, setPlan] = useState<'free' | 'pro'>('free');
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
+  const user = useAuthStore((s) => s.user);
 
-  // Busca transações reais do backend
+  useEffect(() => {
+    const fetchPlan = async () => {
+      try {
+        const api = ApiService.getInstance();
+        const me = await api.getCurrentUser();
+        const sub = me?.user?.subscription_plan;
+        if (sub === 'pro') setPlan('pro');
+        else setPlan('free');
+      } catch {
+        setPlan('free');
+      }
+    };
+    fetchPlan();
+  }, [user]);
+
   useEffect(() => {
     const fetchTransactions = async () => {
       try {
-        const apiService = ApiService.getInstance();
-        const response = await apiService.getTransactionHistory({ 
-          page: currentPage, 
-          limit: 10 
-        });
-        setAllTransactions(response.transactions || []);
-        setTotalPages(response.pagination?.pages || 1);
+        const { getLocalHistory, mergeHistory } = await import('../../lib/history/local-history');
+        const local = await getLocalHistory(50);
+        let apiRows: any[] = [];
+        try {
+          const apiService = ApiService.getInstance();
+          const response = await apiService.getTransactionHistory({
+            page: currentPage,
+            limit: 10,
+          });
+          apiRows = response.transactions || [];
+          setTotalPages(response.pagination?.pages || 1);
+        } catch (error) {
+          console.warn('API history unavailable, using local only', error);
+          setTotalPages(1);
+        }
+        setAllTransactions(mergeHistory(apiRows, local, 50));
       } catch (error) {
         console.error('Error fetching transactions:', error);
         setAllTransactions([]);
@@ -31,10 +55,29 @@ const History: React.FC<HistoryProps> = ({ onBack, onNavigateToPlans }) => {
     };
 
     fetchTransactions();
+    const onStorage = (
+      changes: { [key: string]: chrome.storage.StorageChange },
+      area: string
+    ) => {
+      if (area === 'local' && changes.vetraHistory) fetchTransactions();
+    };
+    try {
+      chrome.storage.onChanged.addListener(onStorage);
+    } catch {
+      /* ignore */
+    }
+    return () => {
+      try {
+        chrome.storage.onChanged.removeListener(onStorage);
+      } catch {
+        /* ignore */
+      }
+    };
   }, [currentPage]);
 
-  // Filtra transações baseado no plano (Free = apenas 3)
-  const transactions = isFreePlan ? allTransactions.slice(0, 3) : allTransactions;
+  const isFreePlan = plan === 'free';
+  // Free: last 5 local/API rows; Pro: full list (cloud DB later)
+  const transactions = isFreePlan ? allTransactions.slice(0, 5) : allTransactions;
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -82,34 +125,28 @@ const History: React.FC<HistoryProps> = ({ onBack, onNavigateToPlans }) => {
   return (
     <div className="w-full h-full bg-dark-bg text-dark-text p-4 space-y-6 overflow-y-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button 
-            className="p-2 text-gray-400 hover:text-white"
-            onClick={onBack}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <h1 
-            style={{
-              fontFamily: 'Arial',
-              fontWeight: '700',
-              fontSize: '18px',
-              lineHeight: '24px',
-              letterSpacing: '0px',
-              color: '#E6E6E6'
-            }}
-          >
-            Transaction Analysis
-          </h1>
-        </div>
-        <button className="p-2 text-gray-400 hover:text-white">
+      <div className="flex items-center gap-3">
+        <button 
+          className="p-2 text-gray-400 hover:text-white"
+          onClick={onBack}
+          type="button"
+        >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
+        <h1 
+          style={{
+            fontFamily: 'Arial',
+            fontWeight: '700',
+            fontSize: '18px',
+            lineHeight: '24px',
+            letterSpacing: '0px',
+            color: '#E6E6E6'
+          }}
+        >
+          Transaction Analysis
+        </h1>
       </div>
 
       {/* Table */}
@@ -389,7 +426,7 @@ const History: React.FC<HistoryProps> = ({ onBack, onNavigateToPlans }) => {
                 marginBottom: '4px'
               }}
             >
-              Limited history (last 3 transactions)
+              Limited history (last 5 transactions)
             </p>
             <p 
               style={{
