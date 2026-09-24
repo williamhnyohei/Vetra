@@ -198,11 +198,14 @@ async function analyzeTransactionWithMultiAgent(transactionData, options = {}) {
     };
 
   } catch (error) {
-    logger.error('Multi-Agent analysis error:', error);
-    
+    logger.error('Multi-Agent analysis error', {
+      message: error.message,
+      code: error.code,
+    });
+
     // Fallback to basic analysis if Multi-Agent System fails
     logger.warn('Falling back to basic risk analysis');
-    return fallbackAnalysis(transactionData);
+    return await fallbackAnalysis(transactionData);
   }
 }
 
@@ -347,7 +350,7 @@ function validateOutputData(outputData) {
   }
 
   if (outputData.risk_assessment.score < 0 || outputData.risk_assessment.score > 100) {
-    throw new Error('Risk score must be between 0 and 100');
+    throw new Error('Risk score must be between 0 and 100 (or 0–1 from MAS)');
   }
 
   const validLevels = ['low', 'medium', 'high'];
@@ -360,14 +363,25 @@ function validateOutputData(outputData) {
  * Normalize analysis result to internal format
  */
 function normalizeAnalysisResult(analysisResult) {
+  let score = Number(analysisResult.risk_assessment.score);
+  // MAS returns 0–1; backend UI uses 0–100
+  if (score <= 1) score = Math.round(score * 100);
+  else score = Math.round(score);
+
+  const level =
+    analysisResult.risk_assessment.level ||
+    (score >= 70 ? 'high' : score >= 40 ? 'medium' : 'low');
+
   return {
     // Main risk assessment
-    score: Math.round(analysisResult.risk_assessment.score),
-    level: analysisResult.risk_assessment.level,
+    score,
+    level,
     confidence: analysisResult.risk_assessment.confidence || 0.8,
 
     // Risk factors for display
-    reasons: (analysisResult.risk_factors || []).map(factor => factor.description),
+    reasons: (analysisResult.risk_factors || []).map((factor) =>
+      typeof factor === 'string' ? factor : factor.description || factor.factor || String(factor)
+    ),
 
     // Detailed agent analysis
     agent_analysis: analysisResult.agent_analysis || {},
@@ -377,7 +391,7 @@ function normalizeAnalysisResult(analysisResult) {
 
     // Recommendations
     recommendations: analysisResult.recommendations || {
-      action: analysisResult.risk_assessment.level === 'high' ? 'block' : 'approve',
+      action: level === 'high' ? 'block' : 'approve',
       reason: 'Based on risk assessment',
       alternative_actions: [],
     },
@@ -403,61 +417,123 @@ function normalizeAnalysisResult(analysisResult) {
 
 /**
  * Fallback analysis when Multi-Agent System is unavailable
+ * Uses Solana RPC when possible for lightweight on-chain signals.
  */
-function fallbackAnalysis(transactionData) {
+async function fallbackAnalysis(transactionData) {
   logger.warn('Using fallback risk analysis');
 
-  // Basic heuristic-based analysis
-  let score = 50; // Start with medium risk
+  let score = 20;
   const reasons = [];
+  const scoreBreakdown = [
+    { factor: 'baseline', points: 20, detail: 'Fallback baseline (MAS offline)' },
+  ];
 
-  // Check transaction amount
   const amount = parseFloat(transactionData.amount);
-  if (amount > 1000000) {
-    score += 20;
-    reasons.push('Extremely high transaction amount');
-  } else if (amount > 100000) {
+  if (Number.isFinite(amount) && amount > 0) {
+    // amount may be SOL (display) or still lamports — normalize
+    const sol = amount >= 1000 ? amount / 1e9 : amount;
+    if (sol > 100) {
+      score += 25;
+      reasons.push('Very high transaction amount');
+      scoreBreakdown.push({ factor: 'amount', points: 25, detail: `${sol} SOL` });
+    } else if (sol > 10) {
+      score += 15;
+      reasons.push('High transaction amount');
+      scoreBreakdown.push({ factor: 'amount', points: 15, detail: `${sol} SOL` });
+    } else if (sol > 1) {
+      score += 5;
+      scoreBreakdown.push({ factor: 'amount', points: 5, detail: `${sol} SOL` });
+    }
+  }
+
+  const type = String(transactionData.type || '').toLowerCase();
+  if (type === 'approve' || type.includes('approve')) {
+    score += 30;
+    reasons.push('Approval / allowance style transaction');
+    scoreBreakdown.push({ factor: 'approve', points: 30, detail: 'Allowance-style tx' });
+  }
+  if (type === 'unknown' || type === 'rpc_send') {
     score += 10;
-    reasons.push('High transaction amount');
+    reasons.push('Limited transaction metadata available');
+    scoreBreakdown.push({ factor: 'limited_metadata', points: 10 });
   }
 
-  // Check transaction type
-  if (transactionData.type === 'approve') {
-    score += 15;
-    reasons.push('Approval transactions can be risky');
+  if (!transactionData.to || transactionData.to === 'Unknown') {
+    score += 8;
+    reasons.push('Destination address unknown');
+    scoreBreakdown.push({ factor: 'unknown_destination', points: 8 });
   }
 
-  // Determine level
+  const rpcUrl = process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com';
+  try {
+    if (transactionData.to && transactionData.to !== 'Unknown' && transactionData.to.length >= 32) {
+      const axios = require('axios');
+      const resp = await axios.post(
+        rpcUrl,
+        {
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'getAccountInfo',
+          params: [transactionData.to, { encoding: 'base64' }],
+        },
+        { timeout: 4000 }
+      );
+      const value = resp?.data?.result?.value;
+      if (value === null) {
+        score += 12;
+        reasons.push('Destination account has no on-chain history (unfunded)');
+        scoreBreakdown.push({
+          factor: 'unfunded_destination',
+          points: 12,
+          detail: 'Destination has no on-chain history',
+        });
+      }
+    }
+  } catch (e) {
+    logger.warn('Fallback RPC enrichment failed:', e.message);
+  }
+
+  const programs = transactionData.programs || transactionData.instructions || [];
+  if (Array.isArray(programs) && programs.length > 8) {
+    score += 8;
+    reasons.push('Unusually many instructions/programs');
+    scoreBreakdown.push({ factor: 'many_instructions', points: 8 });
+  }
+
+  score = Math.min(100, Math.max(0, score));
+
   let level;
-  if (score >= 70) {
-    level = 'high';
-  } else if (score >= 40) {
-    level = 'medium';
-  } else {
-    level = 'low';
-  }
+  if (score >= 70) level = 'high';
+  else if (score >= 40) level = 'medium';
+  else level = 'low';
 
   if (reasons.length === 0) {
-    reasons.push('Basic heuristic analysis performed');
+    reasons.push('Basic heuristic analysis performed (MAS unavailable)');
   }
 
   return {
-    score: Math.min(100, Math.max(0, score)),
+    score,
     level,
-    confidence: 0.5, // Lower confidence for fallback
+    confidence: 0.55,
     reasons,
+    scoreBreakdown,
     agent_analysis: {},
-    risk_factors: [],
+    risk_factors: reasons.map((r) => ({
+      factor: r,
+      severity: level,
+      description: r,
+    })),
     recommendations: {
-      action: level === 'high' ? 'review' : 'approve',
+      action: level === 'high' ? 'block' : level === 'medium' ? 'review' : 'approve',
       reason: 'Fallback analysis - Multi-Agent System unavailable',
-      alternative_actions: ['Wait for Multi-Agent System', 'Manual review'],
+      alternative_actions: ['Retry with MAS online', 'Manual review'],
     },
-    evidence: {},
+    evidence: {
+      source: 'fallback-heuristics+rpc',
+    },
     metadata: {
-      source: 'fallback-analysis',
+      source: 'fallback',
       timestamp: new Date().toISOString(),
-      warning: 'Multi-Agent System unavailable',
     },
     heuristics: {
       multi_agent_analysis: false,
@@ -477,22 +553,23 @@ function fallbackAnalysis(transactionData) {
  */
 async function checkMultiAgentHealth() {
   try {
-    const response = await axios.get(
-      `${MULTI_AGENT_CONFIG.apiUrl}/health`,
-      {
-        timeout: 5000,
-        headers: {
-          'X-API-Key': MULTI_AGENT_CONFIG.apiKey,
-        },
-      }
-    );
+    // apiUrl is the full analyze endpoint; derive health URL
+    const analyzeUrl = MULTI_AGENT_CONFIG.apiUrl;
+    const healthUrl = analyzeUrl.replace(/\/api\/analyze\/?$/, '/api/health');
+
+    const response = await axios.get(healthUrl, {
+      timeout: 5000,
+      headers: {
+        'X-API-Key': MULTI_AGENT_CONFIG.apiKey,
+      },
+    });
 
     return {
       available: true,
       status: response.status,
       data: response.data,
+      url: healthUrl,
     };
-
   } catch (error) {
     logger.error('Multi-Agent System health check failed:', error.message);
     return {
