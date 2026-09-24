@@ -1,7 +1,6 @@
 /**
- * Build-time / env flags for injected (MAIN world) behavior.
- * Set VITE_VETRA_AWAIT_ANALYSIS=true to block signing until analysis response arrives.
+ * Build-time flags for injected (MAIN world) behavior.
+ * Must NOT reference import.meta — Chrome injects this as a classic script.
+ * Default ON: wait for analysis before signing.
  */
-export const VETRA_AWAIT_ANALYSIS =
-  typeof import.meta !== 'undefined' &&
-  (import.meta as ImportMeta).env?.VITE_VETRA_AWAIT_ANALYSIS === 'true';
+export const VETRA_AWAIT_ANALYSIS = true;

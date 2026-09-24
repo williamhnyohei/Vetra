@@ -2,15 +2,17 @@
 
 import { installSolanaInterceptor } from './wrap-provider';
 
-// evita rodar 2x se o content mandar injetar de novo
-if ((window as any).__VETRA_INJECTED__) {
-  console.log('🟣 Vetra injected: already present, skipping');
-} else {
-  (window as any).__VETRA_INJECTED__ = true;
-  console.log('🟣 Vetra injected script loaded');
+const already = !!(window as any).__VETRA_INJECTED__;
+(window as any).__VETRA_INJECTED__ = true;
+console.log(
+  already
+    ? '🟣 Vetra injected: re-running patch'
+    : '🟣 Vetra injected script loaded'
+);
 
-  installSolanaInterceptor(window);
+installSolanaInterceptor(window);
 
+if (!already) {
   /**
    * Tenta descobrir o provider de acordo com o que o popup pediu.
    * Suporta: phantom, backpack, solflare e auto.
