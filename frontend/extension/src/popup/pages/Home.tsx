@@ -4,6 +4,9 @@ import { t } from '../../i18n';
 import ApiService from '../../services/api-service';
 import { useAuthStore } from '../../store/auth-store';
 
+/** Max rows on Home — rest go via “old transactions” → History */
+const HOME_PREVIEW_LIMIT = 2;
+
 interface HomeProps {
   onNavigateToAnalysis?: () => void;
   onNavigateToConnectWallet?: () => void;
@@ -13,8 +16,26 @@ interface HomeProps {
   onNavigateToTransaction?: (transactionId: string) => void;
 }
 
+function formatTxAmount(tx: any): string {
+  const raw = tx?.amount;
+  if (raw === undefined || raw === null || raw === '' || raw === '0') {
+    return tx?.type || '—';
+  }
+  const n = parseFloat(String(raw));
+  if (!Number.isFinite(n) || n === 0) return tx?.type || '—';
+  // stored as lamports (integer) or already SOL
+  const sol = !String(raw).includes('.') && n >= 1000 ? n / 1e9 : n;
+  if (sol < 0.0001) return `${sol.toPrecision(3)} SOL`;
+  return `${sol.toFixed(4).replace(/\.?0+$/, '')} SOL`;
+}
+
+function shortAddr(addr?: string): string {
+  if (!addr) return 'Desconhecido';
+  if (addr.length < 10) return addr;
+  return `${addr.substring(0, 5)}...${addr.substring(addr.length - 4)}`;
+}
+
 const Home: React.FC<HomeProps> = ({
-  onNavigateToAnalysis,
   onNavigateToConnectWallet,
   onNavigateToPlans,
   onNavigateToSettings,
@@ -23,34 +44,84 @@ const Home: React.FC<HomeProps> = ({
 }) => {
   const { language } = useLanguageStore();
   const { wallet } = useAuthStore((s) => ({ wallet: s.wallet }));
-  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
+  const [allTransactions, setAllTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [protectStatus, setProtectStatus] = useState<string | null>(null);
 
-  // Busca transações reais do backend
+  const activateOnTab = () => {
+    setProtectStatus('Ativando proteção na aba…');
+    chrome.runtime.sendMessage({ type: 'INJECT_ACTIVE_TAB' }, (res) => {
+      if (chrome.runtime.lastError) {
+        setProtectStatus('Falha: ' + chrome.runtime.lastError.message);
+        return;
+      }
+      if (res?.ok) {
+        setProtectStatus('Proteção injetada — dê F5 na página e envie a tx.');
+      } else {
+        setProtectStatus('Falha: ' + (res?.error || 'desconhecida'));
+      }
+    });
+  };
+
   useEffect(() => {
+    let cancelled = false;
+    let initial = true;
+
     const fetchTransactions = async () => {
       try {
-        setLoading(true);
-        const apiService = ApiService.getInstance();
-        const response = await apiService.getTransactionHistory({ limit: 3 });
-        console.log('📊 Transactions loaded:', response.transactions);
-        setRecentTransactions(response.transactions || []);
+        if (initial) setLoading(true);
+        const { getLocalHistory, mergeHistory, FREE_HISTORY_LIMIT } = await import(
+          '../../lib/history/local-history'
+        );
+        const local = await getLocalHistory(20);
+        let apiRows: any[] = [];
+        try {
+          const apiService = ApiService.getInstance();
+          const response = await apiService.getTransactionHistory({ limit: 10 });
+          apiRows = response.transactions || [];
+        } catch (error) {
+          console.warn('API history unavailable, using local only', error);
+        }
+        if (cancelled) return;
+        setAllTransactions(mergeHistory(apiRows, local, FREE_HISTORY_LIMIT));
       } catch (error) {
         console.error('Error fetching transactions:', error);
-        setRecentTransactions([]);
+        if (!cancelled) setAllTransactions([]);
       } finally {
-        setLoading(false);
+        if (!cancelled && initial) {
+          setLoading(false);
+          initial = false;
+        }
       }
     };
 
     fetchTransactions();
-
-    // Recarrega a cada 2 segundos para pegar novas transações
-    const interval = setInterval(fetchTransactions, 2000);
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchTransactions, 5000);
+    const onStorage = (
+      changes: { [key: string]: chrome.storage.StorageChange },
+      area: string
+    ) => {
+      if (area === 'local' && changes.vetraHistory) fetchTransactions();
+    };
+    try {
+      chrome.storage.onChanged.addListener(onStorage);
+    } catch {
+      /* ignore */
+    }
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      try {
+        chrome.storage.onChanged.removeListener(onStorage);
+      } catch {
+        /* ignore */
+      }
+    };
   }, []);
 
-  // label do botão de wallet no topo
+  const preview = allTransactions.slice(0, HOME_PREVIEW_LIMIT);
+  const hasOlder = allTransactions.length > HOME_PREVIEW_LIMIT;
+
   const walletButtonLabel = (() => {
     if (wallet?.address) {
       const short = `${wallet.address.slice(0, 4)}…${wallet.address.slice(-4)}`;
@@ -58,105 +129,76 @@ const Home: React.FC<HomeProps> = ({
         wallet.provider === 'phantom'
           ? 'Phantom'
           : wallet.provider === 'backpack'
-          ? 'Backpack'
-          : wallet.provider === 'solflare'
-          ? 'Solflare'
-          : 'Wallet';
+            ? 'Backpack'
+            : wallet.provider === 'solflare'
+              ? 'Solflare'
+              : 'Wallet';
       return `${provider}: ${short}`;
     }
-    // tenta pegar do i18n; se não tiver, fallback
     return t('Connect Wallet', language) || 'Connect wallet';
   })();
 
   const walletButtonColor = wallet?.address ? '#00D386' : '#FFFFFF';
 
   return (
-    <div className="w-full h-full bg-dark-bg text-dark-text p-4 space-y-4 overflow-y-auto">
+    <div
+      className="w-full h-full bg-dark-bg text-dark-text flex flex-col overflow-hidden"
+      style={{ padding: 16, gap: 12 }}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {/* Logo Vetra */}
-          <div className="w-8 h-8">
+      <div className="flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 shrink-0">
             <img
               src="/assets/logo.svg"
               alt="Vetra Logo"
               className="w-8 h-8"
-              style={{ maxWidth: '32px', maxHeight: '32px' }}
+              style={{ maxWidth: 32, maxHeight: 32 }}
             />
           </div>
           <div className="flex flex-col">
-            <span
-              style={{
-                fontFamily: 'Arial',
-                fontWeight: '400',
-                fontSize: '12px',
-                lineHeight: '16px',
-                letterSpacing: '0px',
-                color: '#E6E6E6',
-              }}
-            >
+            <span style={{ fontSize: 12, lineHeight: '16px', color: '#E6E6E6' }}>
               {t('home.status', language)}
             </span>
             <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span
-                style={{
-                  fontFamily: 'Arial',
-                  fontWeight: '400',
-                  fontSize: '12px',
-                  lineHeight: '16px',
-                  letterSpacing: '0px',
-                  color: '#E6E6E6',
-                }}
-              >
+              <div className="w-2 h-2 bg-green-500 rounded-full" />
+              <span style={{ fontSize: 12, lineHeight: '16px', color: '#E6E6E6' }}>
                 {t('home.protected', language)}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
+            type="button"
             className="px-3 py-1 rounded-full"
             style={{
               backgroundColor: '#1E1E1E',
-              fontFamily: 'Arial',
-              fontWeight: '400',
-              fontSize: '12px',
-              lineHeight: '16px',
-              letterSpacing: '0px',
+              fontSize: 12,
               color: walletButtonColor,
-              maxWidth: '150px',
+              maxWidth: 120,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
             }}
             onClick={onNavigateToConnectWallet}
-            title={wallet?.address ? wallet.address : undefined}
+            title={wallet?.address || undefined}
           >
             {walletButtonLabel}
           </button>
           <button
+            type="button"
             className="px-3 py-1 rounded-full"
-            style={{
-              backgroundColor: '#1E1E1E',
-              fontFamily: 'Arial',
-              fontWeight: '400',
-              fontSize: '12px',
-              lineHeight: '16px',
-              letterSpacing: '0px',
-              color: '#FFFFFF',
-            }}
+            style={{ backgroundColor: '#1E1E1E', fontSize: 12, color: '#FFFFFF' }}
             onClick={onNavigateToPlans}
           >
             {t('home.free', language)}
           </button>
           <button
+            type="button"
             className="p-2 rounded-full"
-            style={{
-              backgroundColor: '#1E1E1E',
-              color: '#FFFFFF',
-            }}
+            style={{ backgroundColor: '#1E1E1E', color: '#FFFFFF' }}
             onClick={onNavigateToSettings}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -166,122 +208,61 @@ const Home: React.FC<HomeProps> = ({
                 strokeWidth={2}
                 d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
               />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
             </svg>
           </button>
         </div>
       </div>
 
-      {/* Alerta de transação pendente - só aparece quando houver transação real */}
-      {recentTransactions.length > 0 &&
-        recentTransactions[0].status === 'pending' &&
-        recentTransactions[0].risk_level === 'high' && (
-          <div className="bg-dark-card rounded-lg p-4 border border-yellow-500/20">
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0">
-                <img src="/assets/icon-warning.svg" alt="Warning" className="w-6 h-6" />
-              </div>
-              <div className="flex-1">
-                <h3
-                  style={{
-                    fontFamily: 'Arial',
-                    fontWeight: '400',
-                    fontSize: '14px',
-                    lineHeight: '20px',
-                    letterSpacing: '0px',
-                    color: '#E6E6E6',
-                    marginBottom: '4px',
-                  }}
-                >
-                  {t('home.highRiskDetected', language)}
-                </h3>
-                <p
-                  style={{
-                    fontFamily: 'Arial',
-                    fontWeight: '400',
-                    fontSize: '14px',
-                    lineHeight: '20px',
-                    letterSpacing: '0px',
-                    color: '#858C94',
-                    marginBottom: '16px',
-                  }}
-                >
-                  {recentTransactions[0].amount
-                    ? `${(parseFloat(recentTransactions[0].amount) / 1e9).toFixed(4)} SOL`
-                    : recentTransactions[0].type}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-3" style={{ marginLeft: '0' }}>
-              <button
-                className="flex-1 rounded-lg flex items-center justify-center gap-2 transition-colors"
-                style={{
-                  backgroundColor: '#FBB500',
-                  color: '#1A141F',
-                  fontFamily: 'Arial',
-                  fontWeight: '700',
-                  fontSize: '14px',
-                  lineHeight: '20px',
-                  letterSpacing: '0px',
-                  height: '3rem',
-                  paddingLeft: '16px',
-                  paddingRight: '16px',
-                }}
-                onClick={() => onNavigateToTransaction?.(recentTransactions[0].id)}
-              >
-                <img src="/assets/icon-analysis.svg" alt="Analysis" className="w-5 h-5" />
-                {t('home.viewAnalysis', language)}
-              </button>
-              <button
-                className="flex-1 rounded-lg flex items-center justify-center gap-2 transition-colors"
-                style={{
-                  backgroundColor: '#DA291C',
-                  color: '#FFFFFF',
-                  fontFamily: 'Arial',
-                  fontWeight: '400',
-                  fontSize: '14px',
-                  lineHeight: '20px',
-                  letterSpacing: '0px',
-                  height: '3rem',
-                  paddingLeft: '16px',
-                  paddingRight: '16px',
-                }}
-              >
-                <img src="/assets/icon-blocked.svg" alt="Block" className="w-5 h-5" />
-                {t('home.block', language)}
-              </button>
-            </div>
-          </div>
-        )}
-
-      {/* Recent Activity */}
-      <div style={{ marginTop: '1rem', marginBottom: '0.75rem' }}>
-        <h2
+      <button
+        type="button"
+        onClick={activateOnTab}
+        className="w-full rounded-lg py-2.5 px-3 text-sm shrink-0"
+        style={{ backgroundColor: '#FBB500', color: '#1A141F', fontWeight: 700 }}
+      >
+        Ativar proteção nesta aba
+      </button>
+      {protectStatus && (
+        <p
+          className="shrink-0 rounded-md px-2.5 py-2"
           style={{
-            fontFamily: 'Arial',
-            fontWeight: '400',
-            fontSize: '14px',
-            lineHeight: '20px',
-            letterSpacing: '0px',
+            backgroundColor: '#1E1E1E',
             color: '#E6E6E6',
-            marginBottom: '0.75rem',
+            fontSize: 12,
+            lineHeight: '16px',
+            marginTop: 0,
           }}
+        >
+          {protectStatus}
+        </p>
+      )}
+
+      {/* Recent Activity — fixed slots, no scroll */}
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <h2
+          className="shrink-0"
+          style={{ fontSize: 14, lineHeight: '20px', color: '#E6E6E6', marginBottom: 8 }}
         >
           {t('home.recentActivity', language)}
         </h2>
-        <div className="space-y-3">
+
+        <div className="flex flex-col gap-2 flex-1 min-h-0 overflow-hidden">
           {loading ? (
-            <div className="text-center py-8 text-gray-400">Carregando...</div>
-          ) : recentTransactions.length === 0 ? (
-            <div className="text-center py-8">
-              <p style={{ color: '#858C94', fontSize: '14px' }}>Nenhuma transação ainda</p>
-              <p style={{ color: '#858C94', fontSize: '12px', marginTop: '8px' }}>
+            <div className="text-center py-6 text-gray-400 text-sm">Carregando...</div>
+          ) : preview.length === 0 ? (
+            <div className="text-center py-6">
+              <p style={{ color: '#858C94', fontSize: 14 }}>Nenhuma transação ainda</p>
+              <p style={{ color: '#858C94', fontSize: 12, marginTop: 6 }}>
                 As transações aparecem aqui quando interceptadas
               </p>
             </div>
           ) : (
-            recentTransactions.map((tx) => {
+            preview.map((tx) => {
               let icon = '/assets/icon-success.svg';
               if (tx.status === 'rejected' || tx.risk_level === 'high') {
                 icon = '/assets/icon-forbidden.svg';
@@ -292,84 +273,91 @@ const Home: React.FC<HomeProps> = ({
               return (
                 <div
                   key={tx.id}
-                  className="bg-dark-card rounded-lg p-4 flex items-center justify-between hover:bg-dark-card/80 transition-colors cursor-pointer"
+                  className="bg-dark-card rounded-lg px-3 py-3 flex items-center justify-between cursor-pointer shrink-0"
                   onClick={() => onNavigateToTransaction?.(tx.id)}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 flex items-center justify-center">
-                      <img src={icon} alt="Status" className="w-4 h-4" />
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 flex items-center justify-center shrink-0">
+                      <img src={icon} alt="" className="w-4 h-4" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p
-                        style={{
-                          fontFamily: 'Arial',
-                          fontWeight: '400',
-                          fontSize: '14px',
-                          lineHeight: '20px',
-                          letterSpacing: '0px',
-                          color: '#E6E6E6',
-                        }}
+                        className="truncate"
+                        style={{ fontSize: 14, lineHeight: '18px', color: '#E6E6E6' }}
                       >
-                        {tx.to_address
-                          ? `${tx.to_address.substring(0, 5)}...${tx.to_address.substring(
-                              tx.to_address.length - 4,
-                            )}`
-                          : 'Desconhecido'}
+                        {shortAddr(tx.to_address)}
                       </p>
-                      <p
-                        style={{
-                          fontFamily: 'Arial',
-                          fontWeight: '400',
-                          fontSize: '14px',
-                          lineHeight: '20px',
-                          letterSpacing: '0px',
-                          color: '#858C94',
-                        }}
-                      >
-                        {tx.amount ? `${(parseFloat(tx.amount) / 1e9).toFixed(4)} SOL` : tx.type}
+                      <p style={{ fontSize: 13, lineHeight: '18px', color: '#858C94' }}>
+                        {formatTxAmount(tx)}
                       </p>
                     </div>
                   </div>
-                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  <svg
+                    className="w-5 h-5 text-gray-400 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
                   </svg>
                 </div>
               );
             })
           )}
+
+          {hasOlder && (
+            <button
+              type="button"
+              onClick={onNavigateToHistory}
+              className="w-full rounded-lg py-2.5 text-sm shrink-0"
+              style={{
+                backgroundColor: 'transparent',
+                border: '1px solid #333',
+                color: '#FBB500',
+                fontWeight: 500,
+              }}
+            >
+              Ver transações antigas
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Bottom Buttons */}
-      <div className="flex gap-3" style={{ marginTop: '1rem' }}>
+      {/* Footer — always visible */}
+      <div className="flex gap-3 shrink-0">
         <button
-          className="flex-1 bg-dark-card rounded-lg p-4 flex items-center justify-center gap-2 hover:bg-dark-card/80 transition-colors"
-          style={{
-            fontFamily: 'Arial',
-            fontWeight: '400',
-            fontSize: '14px',
-            lineHeight: '20px',
-            letterSpacing: '0px',
-            color: '#E6E6E6',
-          }}
+          type="button"
+          className="flex-1 bg-dark-card rounded-lg py-3 px-3 flex items-center justify-center gap-2"
+          style={{ fontSize: 14, color: '#E6E6E6' }}
           onClick={onNavigateToHistory}
         >
-          <img src="/assets/icon-history.svg" alt="History" className="w-5 h-5" />
+          <img
+            src="/assets/icon-history.svg"
+            alt=""
+            width={20}
+            height={20}
+            className="w-5 h-5 shrink-0"
+          />
           <span>{t('home.history', language)}</span>
         </button>
         <button
-          className="flex-1 bg-dark-card rounded-lg p-4 flex items-center justify-center gap-2 hover:bg-dark-card/80 transition-colors"
-          style={{
-            fontFamily: 'Arial',
-            fontWeight: '400',
-            fontSize: '14px',
-            lineHeight: '20px',
-            letterSpacing: '0px',
-            color: '#E6E6E6',
-          }}
+          type="button"
+          className="flex-1 bg-dark-card rounded-lg py-3 px-3 flex items-center justify-center gap-2"
+          style={{ fontSize: 14, color: '#E6E6E6' }}
           onClick={onNavigateToPlans}
         >
-          <img src="/assets/icon-payment-card.svg" alt="Plans" className="w-5 h-5" />
+          <img
+            src="/assets/icon-payment-card.svg"
+            alt=""
+            width={20}
+            height={20}
+            className="w-5 h-5 shrink-0"
+          />
           <span>{t('home.plans', language)}</span>
         </button>
       </div>
