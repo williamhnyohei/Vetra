@@ -334,17 +334,36 @@
             log('🌐 Página carregada', 'info');
             log(`📍 RPC Devnet: ${DEVNET_RPC}`, 'info');
             log('⏳ Aguardando conexão da carteira...', 'info');
-            
-            // Verificar se Phantom está instalado
+
+            // Vetra hook status (must be http:// not file://)
             setTimeout(() => {
+                const hook = window.__VETRA_HOOK__;
+                const injected = window.__VETRA_INTERCEPTOR__ || window.__VETRA_INJECTED__;
+                if (hook || injected) {
+                    log(`🛡️ Vetra hook: ${hook || 'present'} interceptor=${!!injected}`, 'success');
+                } else {
+                    log('⚠️ Vetra NÃO detectado nesta página — Reload da extensão + refresh aqui', 'warning');
+                }
                 if (window.solana) {
                     log('✅ Phantom detectado!', 'success');
                     log(`📦 isPhantom: ${window.solana.isPhantom}`, 'info');
+                    log(`📦 vetra_patched: ${!!window.solana.__vetra_method_patched}`, 'info');
                 } else {
                     log('❌ Phantom não encontrado!', 'error');
                     setStatus('❌ Instale a extensão Phantom Wallet', 'error');
                 }
             }, 1000);
+        });
+
+        window.addEventListener('message', (ev) => {
+            if (ev.source !== window) return;
+            if (ev.data?.type === 'VETRA_TRANSACTION_REQUEST') {
+                log('🛡️ Vetra INTERCEPTOU sign — analisando...', 'success');
+            }
+            if (ev.data?.type === 'VETRA_TRANSACTION_RESPONSE') {
+                const r = ev.data.response || {};
+                log(`📥 Vetra análise: ${r.riskLevel || '?'} score=${r.riskScore ?? '?'}`, 'success');
+            }
         });
 
         // Detectar mudanças no window.solana (para debugging)

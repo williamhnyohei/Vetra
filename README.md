@@ -18,24 +18,36 @@ Vetra analyzes Solana transactions in real-time, protecting you from:
 ## Quick Start
 
 ```bash
-# Install dependencies
+# 1) Install monorepo deps
 pnpm install
 
-# Start backend (Terminal 1)
+# 2) Backend infra + API (Terminal 1)
 cd backend
-docker-compose up -d
+docker-compose up -d postgres redis
+cp .env.example .env   # or use the provided local .env
+npm install
 npm run db:migrate
 npm run dev
 
-# Start extension (Terminal 2)
+# 3) Optional: Python MAS (Terminal 2)
+cd vetra_mas
+cp .env.example .env   # set GOOGLE_API_KEY
+pip install -r requirements.txt
+python -m uvicorn vetra_service:app --reload --host 0.0.0.0 --port 5000
+
+# 4) Extension (Terminal 3)
 cd frontend/extension
-pnpm dev
+cp .env.example .env.development   # VITE_API_URL must end with /api
+pnpm install
+pnpm build   # or: pnpm dev
 ```
 
 **Load in Chrome:**
 1. Open `chrome://extensions/`
 2. Enable "Developer mode"
 3. Click "Load unpacked" → Select `frontend/extension/dist`
+
+**Start order:** Postgres/Redis → backend → (optional) MAS → extension build.
 
 ## Project Structure
 
