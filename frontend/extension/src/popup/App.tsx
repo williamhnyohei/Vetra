@@ -42,11 +42,72 @@ function App() {
     checkAuthStatus();
   }, [checkAuthStatus]);
 
+  // Ao abrir o popup, injeta Vetra na aba ativa (precisa do clique do ícone = activeTab)
+  useEffect(() => {
+    try {
+      chrome.runtime?.sendMessage?.({ type: 'INJECT_ACTIVE_TAB' }, (res) => {
+        if (chrome.runtime.lastError) {
+          console.warn('INJECT_ACTIVE_TAB:', chrome.runtime.lastError.message);
+          return;
+        }
+        console.log('INJECT_ACTIVE_TAB result:', res);
+      });
+    } catch (e) {
+      console.warn('INJECT_ACTIVE_TAB failed', e);
+    }
+  }, []);
+
   // quando o auth carregar, decide tela inicial
   useEffect(() => {
-    if (!isLoading) {
-      setCurrentPage(isAuthenticated ? 'home' : 'welcome');
+    if (isLoading) return;
+
+    if (!isAuthenticated) {
+      setCurrentPage('welcome');
+      return;
     }
+
+    const goToAnalysisIfLive = (analysis: any) => {
+      if (
+        analysis &&
+        Date.now() - (analysis.ts || 0) < 120_000 &&
+        (analysis.status === 'analyzing' || analysis.status === 'pending_decision')
+      ) {
+        setSelectedTransactionId(''); // live intercept — not a history review
+        setCurrentPage('transaction-analysis');
+        return true;
+      }
+      return false;
+    };
+
+    chrome.runtime
+      ?.sendMessage?.({ type: 'GET_LATEST_ANALYSIS' })
+      .then((res) => {
+        if (!goToAnalysisIfLive(res?.analysis)) {
+          setCurrentPage('home');
+        }
+      })
+      .catch(() => setCurrentPage('home'));
+
+    const onStorage = (
+      changes: { [key: string]: chrome.storage.StorageChange },
+      area: string
+    ) => {
+      if (area === 'session' && changes.vetraLatestAnalysis?.newValue) {
+        goToAnalysisIfLive(changes.vetraLatestAnalysis.newValue);
+      }
+    };
+    try {
+      chrome.storage.onChanged.addListener(onStorage);
+    } catch {
+      /* ignore */
+    }
+    return () => {
+      try {
+        chrome.storage.onChanged.removeListener(onStorage);
+      } catch {
+        /* ignore */
+      }
+    };
   }, [isAuthenticated, isLoading]);
 
   const renderPage = () => {
@@ -58,9 +119,8 @@ function App() {
               await loginWithGoogle();
               // se der certo, o efeito lá em cima já troca pra home
             }}
-            onContinueAsGuest={() => {
-              loginAsGuest();
-              // idem: o efeito troca pra home
+            onContinueAsGuest={async () => {
+              await loginAsGuest();
             }}
           />
         );
@@ -94,7 +154,10 @@ function App() {
       case 'transaction-analysis':
         return (
           <TransactionAnalysis
-            onBack={() => setCurrentPage('home')}
+            onBack={() => {
+              setSelectedTransactionId('');
+              setCurrentPage('home');
+            }}
             transactionId={selectedTransactionId}
           />
         );
