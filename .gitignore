@@ -193,6 +193,8 @@ Cargo.lock
 # Python
 vetra/
 venv/
+.venv/
+**/.venv/
 # env/  # Commented to allow vetra_mas/env
 ENV/
 __pycache__/
