@@ -49,6 +49,8 @@ const authenticateToken = async (req, res, next) => {
       userId: user.id,
       email: user.email,
       subscription_plan: user.subscription_plan,
+      pubkey: user.wallet_pubkey || null,
+      wallet_pubkey: user.wallet_pubkey || null,
     };
 
     next();

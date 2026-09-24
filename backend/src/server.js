@@ -44,9 +44,26 @@ app.use(helmet({
   },
 }));
 
-// CORS configuration
+// CORS — allow localhost + any chrome-extension:// origin (MV3 popups)
+const configuredOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'],
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (configuredOrigins.includes(origin) || configuredOrigins.includes('*')) {
+      return callback(null, true);
+    }
+    if (
+      origin.startsWith('chrome-extension://') &&
+      configuredOrigins.some((o) => o === 'chrome-extension://*' || o.startsWith('chrome-extension://'))
+    ) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
 }));
 

@@ -24,7 +24,21 @@ const consoleFormat = winston.format.combine(
   winston.format.printf(({ timestamp, level, message, ...meta }) => {
     let msg = `${timestamp} [${level}]: ${message}`;
     if (Object.keys(meta).length > 0) {
-      msg += ` ${JSON.stringify(meta)}`;
+      try {
+        const seen = new WeakSet();
+        msg += ` ${JSON.stringify(meta, (key, value) => {
+          if (typeof value === 'object' && value !== null) {
+            if (seen.has(value)) return '[Circular]';
+            seen.add(value);
+          }
+          if (value instanceof Error) {
+            return { name: value.name, message: value.message, stack: value.stack };
+          }
+          return value;
+        })}`;
+      } catch {
+        msg += ' [meta unavailable]';
+      }
     }
     return msg;
   })
