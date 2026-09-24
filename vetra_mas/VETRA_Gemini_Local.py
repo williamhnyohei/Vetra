@@ -71,55 +71,73 @@ class VetraState(TypedDict, total=False):
 # In[30]:
 
 
-#todo: precisa substituir por integrações reais
+#todo: on-chain tools (Solana RPC + Solscan) via tools.py
 
-@dataclass
-class WebResult:
-    title: str
-    url: str
-    snippet: str
-# ok
-def web_scrape(query: str) -> List[WebResult]:
-    """substituir por coisas reais"""
-    return [
-        WebResult(title="Token X – Site Oficial", url="https://example.com", snippet="Contrato auditado e liquidez travada?"),
-        WebResult(title="Discussão em Fórum", url="https://forum.example/x", snippet="Relatos de possíveis problemas antigos.")
+try:
+    from tools import (
+        WebResult,
+        web_scrape,
+        fetch_private_data,
+        math_estimator,
+        aggregate_final_score,
+        DEFAULT_WEIGHTS,
+        OVERRIDES,
+    )
+except ImportError:
+    @dataclass
+    class WebResult:
+        title: str
+        url: str
+        snippet: str
+
+    def web_scrape(query: str) -> List[WebResult]:
+        return [
+            WebResult(title="Fallback", url="https://solana.com", snippet="tools.py unavailable"),
+        ]
+
+    def fetch_private_data(identifier: str) -> Dict:
+        return {
+            "identifier": identifier,
+            "holders_top10": 0.5,
+            "lp_locked_days": 14,
+            "tx_velocity": 1.0,
+            "age_days": 30,
+        }
+
+    def math_estimator(features: Dict) -> float:
+        risk = 0.0
+        risk += min(1.0, features.get("holders_top10", 0) * 0.8)
+        risk += 0.2 if features.get("lp_locked_days", 0) < 7 else 0.0
+        risk += 0.1 if features.get("age_days", 0) < 14 else 0.0
+        return max(0.0, min(1.0, risk))
+
+    DEFAULT_WEIGHTS = {
+        "phishing": 0.95,
+        "transaction": 0.75,
+        "rugpull": 0.85,
+    }
+    OVERRIDES = [
+        ("phishing", 0.90, 0.98),
+        ("rugpull", 0.90, 0.95),
+        ("transaction", 0.90, 0.95),
     ]
 
-# ok
-def fetch_private_data(identifier: str) -> Dict:
-    """apenas simulcao, precisa substituir por coisas reais"""
-    return {
-        "identifier": identifier,
-        "holders_top10": 0.76,
-        "lp_locked_days": 2,
-        "tx_velocity": 1.8,
-        "age_days": 11,
-    }
-# ok
-def math_estimator(features: Dict) -> float:
-    """calculo heurístico simples de risco (0..1), precisa substituir por algo mais sofisticado"""
-    risk = 0.0
-    risk += min(1.0, features.get("holders_top10", 0) * 0.8)
-    risk += 0.2 if features.get("lp_locked_days", 0) < 7 else 0.0
-    risk += 0.1 if features.get("age_days", 0) < 14 else 0.0
-    return max(0.0, min(1.0, risk))
+    def aggregate_final_score(scores, weights=None, overrides=None):
+        weights = weights or DEFAULT_WEIGHTS
+        overrides = overrides or OVERRIDES
+        prod = 1.0
+        for k, s in scores.items():
+            w = float(weights.get(k, 1.0))
+            prod *= max(0.0, 1.0 - w * min(1.0, max(0.0, s)))
+        final_score = 1.0 - prod
+        for k, threshold, floor_value in overrides:
+            if scores.get(k, 0.0) >= threshold:
+                final_score = max(final_score, floor_value)
+        return float(min(1.0, max(0.0, final_score)))
 
 
+# keep dataclass import used above when fallback path runs
 
-
-DEFAULT_WEIGHTS = {
-    "phishing": 0.95,     # phishing costuma ser “fatal” p/ segurança do usuário
-    "transaction": 0.75,  # risco comportamental on-chain
-    "rugpull": 0.85,      # tokenomics/liquidez perigosos
-}
-
-
-OVERRIDES = [
-    ("phishing",   0.90, 0.98),
-    ("rugpull",    0.90, 0.95),
-    ("transaction",0.90, 0.95),
-]
 
 # # prompts
 
