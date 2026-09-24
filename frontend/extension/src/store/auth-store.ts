@@ -30,7 +30,7 @@ interface AuthState {
 
   // actions
   loginWithGoogle: () => Promise<void>;
-  loginAsGuest: () => void;
+  loginAsGuest: () => Promise<void>;
   logout: () => Promise<void>;
   checkAuthStatus: () => Promise<void>;
   clearError: () => void;
@@ -112,29 +112,62 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   // ---------- GUEST ----------
-  loginAsGuest: () => {
-    const guest = {
-      isAuthenticated: true,
-      user: {
-        id: 'guest-user-id',
-        email: 'guest@vetra.com',
-        name: 'Guest User',
-        provider: 'guest' as const,
-      },
-      // se já tinha wallet conectada antes, mantém
-      wallet: get().wallet ?? null,
-    };
+  loginAsGuest: async () => {
+    set({ isLoading: true, error: null });
 
-    set(guest);
+    try {
+      const authService = AuthService.getInstance();
+      const success = await authService.signInAsGuest();
 
-    localStorage.setItem(
-      LOCAL_KEY,
-      JSON.stringify({
-        provider: 'guest',
-        user: guest.user,
-        wallet: guest.wallet,
-      }),
-    );
+      if (!success) {
+        throw new Error(
+          'Guest authentication failed — start the backend on localhost:3000 and reload the extension.',
+        );
+      }
+
+      const authState = authService.getAuthState();
+      const user = authState.user;
+
+      if (!user || !authState.token) {
+        throw new Error('No guest token received from backend');
+      }
+
+      const apiService = ApiService.getInstance();
+      apiService.setAuthToken(authState.token);
+
+      const next = {
+        isAuthenticated: true,
+        isLoading: false,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          provider: 'guest' as const,
+          token: authState.token,
+        },
+        error: null,
+        wallet: get().wallet ?? null,
+      };
+
+      localStorage.setItem(
+        LOCAL_KEY,
+        JSON.stringify({
+          provider: 'guest',
+          user: next.user,
+          wallet: next.wallet,
+        }),
+      );
+
+      set(next);
+    } catch (error: any) {
+      console.error('Guest login error:', error);
+      set({
+        isAuthenticated: false,
+        isLoading: false,
+        user: null,
+        error: error?.message || 'Failed to sign in as guest',
+      });
+    }
   },
 
   // ---------- LOGOUT ----------
@@ -201,40 +234,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             email: authState.user.email,
             name: authState.user.name,
             avatar: authState.user.picture,
-            provider: 'google',
+            provider: authState.user.email?.includes('guest_') ? 'guest' : 'google',
             token: authState.token || undefined,
           },
           wallet,
         });
       } else {
-        // pode ter guest salvo
-        let guestWallet: WalletInfo | null = null;
-        let isGuest = false;
-        try {
-          const raw = localStorage.getItem(LOCAL_KEY);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (parsed?.user?.provider === 'guest') {
-              isGuest = true;
-              if (parsed?.wallet?.address) guestWallet = parsed.wallet as WalletInfo;
-            }
-          }
-        } catch {
-          // ignore
-        }
-
+        // Guest JWT may live only in AuthService; avoid fake local-only guest
         set({
-          isAuthenticated: isGuest,
+          isAuthenticated: false,
           isLoading: false,
-          user: isGuest
-            ? {
-                id: 'guest-user-id',
-                email: 'guest@vetra.com',
-                name: 'Guest User',
-                provider: 'guest',
-              }
-            : null,
-          wallet: guestWallet,
+          user: null,
+          wallet: null,
         });
       }
     } catch (error) {
@@ -255,12 +266,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   // ---------- WALLET ----------
   setWalletConnected: (wallet: WalletInfo) => {
-    // atualiza estado
-    set({
-      wallet,
-    });
+    set({ wallet });
 
-    // também atualiza o que já tinha no localStorage (guest ou google)
     try {
       const raw = localStorage.getItem(LOCAL_KEY);
       if (raw) {
@@ -268,16 +275,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         parsed.wallet = wallet;
         localStorage.setItem(LOCAL_KEY, JSON.stringify(parsed));
       } else {
-        // se não tinha nada, salva só a wallet (útil pra guest)
-        localStorage.setItem(
-          LOCAL_KEY,
-          JSON.stringify({
-            wallet,
-          }),
-        );
+        localStorage.setItem(LOCAL_KEY, JSON.stringify({ wallet }));
       }
     } catch {
-      // ignore
+      /* ignore */
+    }
+
+    // Persist pubkey on backend for attestations
+    try {
+      const api = ApiService.getInstance();
+      if (api.getAuthToken() && wallet?.address) {
+        void fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/users/profile`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${api.getAuthToken()}`,
+          },
+          body: JSON.stringify({ wallet_pubkey: wallet.address }),
+        }).catch(() => {});
+      }
+    } catch {
+      /* ignore */
     }
   },
 

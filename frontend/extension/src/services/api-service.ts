@@ -3,7 +3,7 @@
  * Handles all API calls to the backend
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://vetra-production.up.railway.app/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 export interface TransactionData {
   signature?: string;
@@ -108,9 +108,9 @@ class ApiService {
   ): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
     
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...(options.headers || {}),
+      ...((options.headers as Record<string, string>) || {}),
     };
 
     // Add auth token if available
@@ -247,7 +247,16 @@ class ApiService {
     success: boolean;
     attestations: any[];
   }> {
-    return this.request(`/attestations/${transactionHash}`);
+    const query = new URLSearchParams({ transactionHash });
+    const data = await this.request<{
+      success: boolean;
+      attestations?: any[];
+      data?: { attestations?: any[] };
+    }>(`/attestations?${query.toString()}`);
+    return {
+      success: data.success,
+      attestations: data.attestations ?? data.data?.attestations ?? [],
+    };
   }
 
   /**
@@ -265,6 +274,22 @@ class ApiService {
     };
   }> {
     return this.request('/health');
+  }
+
+  /**
+   * Current user profile
+   */
+  public async getCurrentUser(): Promise<{
+    success: boolean;
+    user: {
+      id: string;
+      email: string;
+      name: string;
+      subscription_plan?: string;
+      wallet_pubkey?: string;
+    };
+  }> {
+    return this.request('/users/profile');
   }
 
   /**

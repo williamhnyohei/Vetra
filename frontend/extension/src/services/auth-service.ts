@@ -170,7 +170,7 @@ class AuthService {
               console.warn('Could not check for previous guest user:', e);
             }
             
-            const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://vetra-production.up.railway.app/api';
+            const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
             const backendResponse = await fetch(`${API_BASE_URL}/auth/google/extension`, {
               method: 'POST',
               headers: {
@@ -295,7 +295,7 @@ class AuthService {
     try {
       console.log('👤 Signing in as Guest...');
       
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://vetra-production.up.railway.app/api';
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
       
       // Call backend to create guest user
       const response = await fetch(`${API_BASE_URL}/auth/guest`, {
@@ -332,9 +332,12 @@ class AuthService {
 
       console.log('✅ Signed in as Guest successfully');
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Guest sign in error:', error);
-      return false;
+      // Surface message to auth-store instead of a silent false
+      throw error instanceof Error
+        ? error
+        : new Error(error?.message || 'Guest sign in failed');
     }
   }
 
@@ -350,7 +353,7 @@ class AuthService {
       // If guest user, delete from backend
       if (currentProvider === 'guest' && this.authState.token) {
         try {
-          const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://vetra-production.up.railway.app/api';
+          const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
           await fetch(`${API_BASE_URL}/users/me`, {
             method: 'DELETE',
             headers: {

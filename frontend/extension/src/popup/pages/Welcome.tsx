@@ -4,8 +4,8 @@ import { useAuthStore } from '../../store/auth-store';
 import { useLanguageStore } from '../../store/language-store';
 
 interface WelcomeProps {
-  onGoogleLogin: () => void;
-  onContinueAsGuest: () => void;
+  onGoogleLogin: () => void | Promise<void>;
+  onContinueAsGuest: () => void | Promise<void>;
 }
 
 const Welcome: React.FC<WelcomeProps> = ({ onGoogleLogin, onContinueAsGuest }) => {
