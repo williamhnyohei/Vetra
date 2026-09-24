@@ -1,25 +1,33 @@
 /**
  * Multi-Agent System Status Routes
- * Check MAS health and configuration
+ * Reports real HTTP health of the configured MAS (not the mock).
  */
 
 const express = require('express');
-const { getMASStatus } = require('../services/multiAgentSystemMock');
+const { checkMultiAgentHealth, MULTI_AGENT_CONFIG } = require('../services/multiAgentRiskAnalyzer');
 const logger = require('../utils/logger');
 
 const router = express.Router();
 
 /**
  * GET /api/mas/status
- * Get Multi-Agent System status
  */
 router.get('/status', async (req, res) => {
   try {
-    const status = getMASStatus();
-    
+    const health = await checkMultiAgentHealth();
+
     res.json({
       success: true,
-      mas: status,
+      mas: {
+        mode: health.available ? 'live' : 'unavailable',
+        available: health.available,
+        analyzeUrl: MULTI_AGENT_CONFIG.apiUrl,
+        health: health.data || null,
+        error: health.error || null,
+        message: health.available
+          ? 'Connected to Python Multi-Agent System'
+          : 'MAS unreachable — backend will use heuristic fallback',
+      },
     });
   } catch (error) {
     logger.error('MAS status check error:', error);
@@ -31,4 +39,3 @@ router.get('/status', async (req, res) => {
 });
 
 module.exports = router;
-

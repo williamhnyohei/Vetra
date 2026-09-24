@@ -30,6 +30,22 @@ attestation/
 
 ## Quick Start
 
+### Deploy to Devnet
+
+```bash
+# From backend/programs
+bash scripts/deploy-devnet.sh
+```
+
+Then set in `backend/.env`:
+
+```
+ATTESTATION_PROGRAM_ID=<deployed_program_id>
+ATTESTATION_AUTHORITY_SECRET=[/* JSON array of 64 secret key bytes */]
+```
+
+Until deploy + authority are configured, the Node `attestationService` records **off-chain** attestations (no random throwaway keypairs) and still derives the Anchor PDAs from `idl.json`.
+
 ### Build
 
 ```bash

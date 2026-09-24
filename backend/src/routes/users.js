@@ -38,6 +38,7 @@ router.get('/profile', async (req, res) => {
         subscription_plan: user.subscription_plan,
         subscription_expires_at: user.subscription_expires_at,
         is_verified: user.is_verified,
+        wallet_pubkey: user.wallet_pubkey || null,
         created_at: user.created_at,
         last_login_at: user.last_login_at,
       },
@@ -56,6 +57,7 @@ router.get('/profile', async (req, res) => {
 router.patch('/profile', [
   body('name').optional().isString().trim().isLength({ min: 1, max: 100 }),
   body('avatar').optional().isURL(),
+  body('wallet_pubkey').optional().isString().isLength({ min: 32, max: 64 }),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -68,13 +70,15 @@ router.patch('/profile', [
     }
 
     const { userId } = req.user;
-    const { name, avatar } = req.body;
+    const { name, avatar, wallet_pubkey } = req.body;
 
     const updateData = {};
     if (name) updateData.name = name;
     if (avatar) updateData.avatar_url = avatar;
+    if (wallet_pubkey !== undefined) updateData.wallet_pubkey = wallet_pubkey || null;
+    updateData.updated_at = new Date();
 
-    if (Object.keys(updateData).length === 0) {
+    if (Object.keys(updateData).length <= 1) {
       return res.status(400).json({
         success: false,
         error: 'No valid fields to update',
@@ -97,6 +101,7 @@ router.patch('/profile', [
         avatar: updatedUser.avatar_url,
         provider: updatedUser.provider,
         subscription_plan: updatedUser.subscription_plan,
+        wallet_pubkey: updatedUser.wallet_pubkey || null,
         updated_at: updatedUser.updated_at,
       },
     });

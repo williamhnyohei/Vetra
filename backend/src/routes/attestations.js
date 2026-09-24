@@ -44,19 +44,38 @@ router.post('/', [
       stakeAmount,
     } = req.body;
 
-    // Check if user is a provider
-    const provider = await db('providers')
-      .where({ pubkey: req.user.pubkey })
+    const providerPubkey = req.user.pubkey || req.user.wallet_pubkey;
+    if (!providerPubkey) {
+      return res.status(400).json({
+        success: false,
+        error: 'Link a Solana wallet (wallet_pubkey) before creating attestations',
+      });
+    }
+
+    // Check if user is a provider — auto-register if missing
+    let provider = await db('providers')
+      .where({ pubkey: providerPubkey })
       .first();
 
-    if (!provider || !provider.is_active) {
+    if (!provider) {
+      [provider] = await db('providers')
+        .insert({
+          pubkey: providerPubkey,
+          name: req.user.email || 'Provider',
+          is_active: true,
+          reputation: 100,
+        })
+        .returning('*');
+    }
+
+    if (!provider.is_active) {
       return res.status(403).json({
         success: false,
         error: 'Provider not found or inactive',
       });
     }
 
-    // Create attestation on-chain
+    // Create attestation on-chain (or off-chain fallback)
     const attestationResult = await createAttestation({
       providerPubkey: provider.pubkey,
       transactionHash,

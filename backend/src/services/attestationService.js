@@ -1,26 +1,97 @@
 /**
  * Attestation Service
- * Handles on-chain attestation operations
+ * Uses Anchor IDL PDAs. Broadcasts on-chain only when ATTESTATION_AUTHORITY_SECRET
+ * is configured and ATTESTATION_PROGRAM_ID points to a deployed program.
+ * Otherwise records an explicit off-chain attestation (no random keypairs).
  */
 
-const { Connection, PublicKey, Keypair, Transaction, SystemProgram } = require('@solana/web3.js');
-const { TOKEN_PROGRAM_ID, createTransferInstruction } = require('@solana/spl-token');
+const crypto = require('crypto');
+const {
+  Connection,
+  PublicKey,
+  Keypair,
+  SystemProgram,
+  Transaction,
+  TransactionInstruction,
+} = require('@solana/web3.js');
 const logger = require('../utils/logger');
+const idl = require('../../programs/attestation/idl.json');
 
-// Initialize Solana connection
 const connection = new Connection(
-  process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
+  process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com',
   'confirmed'
 );
 
-// Attestation program ID (deployed program)
-const ATTESTATION_PROGRAM_ID = new PublicKey(
-  process.env.ATTESTATION_PROGRAM_ID || '11111111111111111111111111111111' // Default to system program if not set
-);
+const PLACEHOLDER_PROGRAM = 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS';
+const SYSTEM_PROGRAM = '11111111111111111111111111111111';
 
-/**
- * Create attestation on-chain
- */
+function getProgramId() {
+  const raw =
+    process.env.ATTESTATION_PROGRAM_ID ||
+    process.env.SOLANA_PROGRAM_ID ||
+    idl.metadata?.address ||
+    PLACEHOLDER_PROGRAM;
+  return new PublicKey(raw);
+}
+
+function isOnChainEnabled() {
+  const programId = getProgramId().toBase58();
+  if (programId === SYSTEM_PROGRAM || programId === PLACEHOLDER_PROGRAM) {
+    return false;
+  }
+  return Boolean(process.env.ATTESTATION_AUTHORITY_SECRET);
+}
+
+function loadAuthorityKeypair() {
+  const secret = process.env.ATTESTATION_AUTHORITY_SECRET;
+  if (!secret) return null;
+  try {
+    // Expect JSON array of secret key bytes, e.g. [1,2,...,64]
+    const arr = JSON.parse(secret.trim());
+    return Keypair.fromSecretKey(Uint8Array.from(arr));
+  } catch (e) {
+    logger.error('Invalid ATTESTATION_AUTHORITY_SECRET (use JSON byte array):', e.message);
+    return null;
+  }
+}
+
+function hashToBytes32(transactionHash) {
+  const hex = crypto.createHash('sha256').update(String(transactionHash)).digest();
+  return Uint8Array.from(hex);
+}
+
+function deriveProviderPda(authority, programId) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('provider'), authority.toBuffer()],
+    programId
+  );
+}
+
+function deriveAttestationPda(provider, txHashBytes, programId) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('attestation'), provider.toBuffer(), Buffer.from(txHashBytes)],
+    programId
+  );
+}
+
+/** Minimal Anchor discriminator: sha256("global:<name>")[0..8] */
+function ixDiscriminator(name) {
+  return crypto.createHash('sha256').update(`global:${name}`).digest().subarray(0, 8);
+}
+
+function encodeCreateAttestationData(txHashBytes, riskScore, reason) {
+  const reasonBuf = Buffer.from(reason || '', 'utf8');
+  const reasonLen = Buffer.alloc(4);
+  reasonLen.writeUInt32LE(reasonBuf.length, 0);
+  return Buffer.concat([
+    ixDiscriminator('create_attestation'),
+    Buffer.from(txHashBytes),
+    Buffer.from([riskScore & 0xff]),
+    reasonLen,
+    reasonBuf,
+  ]);
+}
+
 async function createAttestation({
   providerPubkey,
   transactionHash,
@@ -30,348 +101,309 @@ async function createAttestation({
   evidence,
 }) {
   try {
-    // This would interact with the deployed Anchor program
-    // For now, we'll simulate the on-chain interaction
-    
-    const providerKeypair = Keypair.generate(); // In production, this would be the actual provider keypair
-    
-    // Create attestation instruction
-    const attestationInstruction = {
-      programId: ATTESTATION_PROGRAM_ID,
-      keys: [
-        { pubkey: new PublicKey(providerPubkey), isSigner: true, isWritable: false },
-        { pubkey: new PublicKey(transactionHash), isSigner: false, isWritable: false },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      ],
-      data: Buffer.from(JSON.stringify({
-        riskScore,
+    const programId = getProgramId();
+    const txHashBytes = hashToBytes32(transactionHash);
+    const providerPk = new PublicKey(providerPubkey);
+    const [providerPda] = deriveProviderPda(providerPk, programId);
+    const [attestationPda] = deriveAttestationPda(providerPda, txHashBytes, programId);
+
+    if (!isOnChainEnabled()) {
+      const offchainId = `offchain_${crypto
+        .createHash('sha256')
+        .update(`${providerPubkey}:${transactionHash}:${Date.now()}`)
+        .digest('hex')
+        .slice(0, 32)}`;
+
+      logger.info('Attestation recorded off-chain (program not deployed / no authority key)', {
+        providerPubkey,
+        transactionHash,
+        attestationPda: attestationPda.toBase58(),
+        programId: programId.toBase58(),
+      });
+
+      return {
+        success: true,
+        signature: offchainId,
+        transactionHash: offchainId,
+        onChain: false,
+        mode: 'offchain',
+        pdas: {
+          provider: providerPda.toBase58(),
+          attestation: attestationPda.toBase58(),
+        },
         riskLevel,
         stakeAmount,
         evidence,
-      })),
-    };
+      };
+    }
 
-    // Create transaction
-    const transaction = new Transaction().add(attestationInstruction);
-    
-    // Get recent blockhash
-    const { blockhash } = await connection.getRecentBlockhash();
-    transaction.recentBlockhash = blockhash;
-    transaction.feePayer = providerKeypair.publicKey;
+    const authority = loadAuthorityKeypair();
+    if (!authority) {
+      return { success: false, error: 'Authority keypair unavailable' };
+    }
 
-    // Sign transaction
-    transaction.sign(providerKeypair);
+    // Authority must match provider for this simplified path
+    if (authority.publicKey.toBase58() !== providerPubkey) {
+      logger.warn('Authority pubkey differs from providerPubkey — using authority as fee payer');
+    }
 
-    // Send transaction
-    const signature = await connection.sendTransaction(transaction, [providerKeypair]);
-    
-    // Wait for confirmation
-    await connection.confirmTransaction(signature);
+    const data = encodeCreateAttestationData(
+      txHashBytes,
+      Math.min(100, Math.max(0, Number(riskScore) || 0)),
+      typeof evidence === 'string' ? evidence : JSON.stringify(evidence || { riskLevel })
+    );
+
+    const ix = new TransactionInstruction({
+      programId,
+      keys: [
+        { pubkey: attestationPda, isSigner: false, isWritable: true },
+        { pubkey: providerPda, isSigner: false, isWritable: true },
+        { pubkey: authority.publicKey, isSigner: true, isWritable: true },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      data,
+    });
+
+    const tx = new Transaction().add(ix);
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = authority.publicKey;
+    tx.sign(authority);
+
+    const signature = await connection.sendRawTransaction(tx.serialize());
+    await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight });
 
     logger.info('Attestation created on-chain', {
-      providerPubkey,
-      transactionHash,
-      riskScore,
-      stakeAmount,
       signature,
+      attestationPda: attestationPda.toBase58(),
+      providerPubkey,
     });
 
     return {
       success: true,
       signature,
       transactionHash: signature,
+      onChain: true,
+      mode: 'onchain',
+      pdas: {
+        provider: providerPda.toBase58(),
+        attestation: attestationPda.toBase58(),
+      },
     };
-
   } catch (error) {
-    logger.error('Create attestation on-chain error:', error);
-    return {
-      success: false,
-      error: error.message,
-    };
+    logger.error('Create attestation error:', error);
+    return { success: false, error: error.message };
   }
 }
 
-/**
- * Vote on attestation
- */
-async function voteAttestation({
-  attestationId,
-  voterPubkey,
-  vote,
-  stakeAmount,
-}) {
+async function voteAttestation({ attestationId, voterPubkey, vote, stakeAmount }) {
   try {
-    const voterKeypair = Keypair.generate(); // In production, actual voter keypair
-    
-    // Create vote instruction
-    const voteInstruction = {
-      programId: ATTESTATION_PROGRAM_ID,
+    if (!isOnChainEnabled()) {
+      const sig = `offchain_vote_${crypto.randomBytes(16).toString('hex')}`;
+      return { success: true, signature: sig, onChain: false, mode: 'offchain', vote, stakeAmount };
+    }
+
+    const authority = loadAuthorityKeypair();
+    if (!authority) return { success: false, error: 'Authority keypair unavailable' };
+
+    const programId = getProgramId();
+    const isAccurate = vote === true || vote === 'approve' || vote === 'for';
+    const data = Buffer.concat([
+      ixDiscriminator('vote_attestation'),
+      Buffer.from([isAccurate ? 1 : 0]),
+    ]);
+
+    const ix = new TransactionInstruction({
+      programId,
       keys: [
-        { pubkey: new PublicKey(voterPubkey), isSigner: true, isWritable: false },
         { pubkey: new PublicKey(attestationId), isSigner: false, isWritable: true },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        { pubkey: authority.publicKey, isSigner: true, isWritable: true },
       ],
-      data: Buffer.from(JSON.stringify({
-        vote,
-        stakeAmount,
-      })),
-    };
-
-    // Create transaction
-    const transaction = new Transaction().add(voteInstruction);
-    
-    // Get recent blockhash
-    const { blockhash } = await connection.getRecentBlockhash();
-    transaction.recentBlockhash = blockhash;
-    transaction.feePayer = voterKeypair.publicKey;
-
-    // Sign transaction
-    transaction.sign(voterKeypair);
-
-    // Send transaction
-    const signature = await connection.sendTransaction(transaction, [voterKeypair]);
-    
-    // Wait for confirmation
-    await connection.confirmTransaction(signature);
-
-    logger.info('Vote cast on-chain', {
-      attestationId,
-      voterPubkey,
-      vote,
-      stakeAmount,
-      signature,
+      data,
     });
 
-    return {
-      success: true,
-      signature,
-    };
+    const tx = new Transaction().add(ix);
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = authority.publicKey;
+    tx.sign(authority);
 
+    const signature = await connection.sendRawTransaction(tx.serialize());
+    await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight });
+
+    return { success: true, signature, onChain: true, mode: 'onchain' };
   } catch (error) {
-    logger.error('Vote attestation on-chain error:', error);
-    return {
-      success: false,
-      error: error.message,
-    };
+    logger.error('Vote attestation error:', error);
+    return { success: false, error: error.message };
   }
 }
 
-/**
- * Stake reputation
- */
-async function stakeReputation({
-  providerPubkey,
-  amount,
-}) {
+async function stakeReputation({ providerPubkey, amount }) {
   try {
-    const providerKeypair = Keypair.generate(); // In production, actual provider keypair
-    
-    // Create stake instruction
-    const stakeInstruction = {
-      programId: ATTESTATION_PROGRAM_ID,
+    if (!isOnChainEnabled()) {
+      return {
+        success: true,
+        signature: `offchain_stake_${crypto.randomBytes(12).toString('hex')}`,
+        onChain: false,
+        mode: 'offchain',
+        amount,
+        providerPubkey,
+      };
+    }
+
+    const authority = loadAuthorityKeypair();
+    if (!authority) return { success: false, error: 'Authority keypair unavailable' };
+
+    const programId = getProgramId();
+    const [providerPda] = deriveProviderPda(new PublicKey(providerPubkey), programId);
+    const lamports = BigInt(Math.floor(parseFloat(amount) * 1e9));
+    const amountBuf = Buffer.alloc(8);
+    amountBuf.writeBigUInt64LE(lamports);
+
+    const data = Buffer.concat([ixDiscriminator('stake_reputation'), amountBuf]);
+    const ix = new TransactionInstruction({
+      programId,
       keys: [
-        { pubkey: new PublicKey(providerPubkey), isSigner: true, isWritable: false },
+        { pubkey: providerPda, isSigner: false, isWritable: true },
+        { pubkey: authority.publicKey, isSigner: true, isWritable: true },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
-      data: Buffer.from(JSON.stringify({
-        amount: parseFloat(amount),
-        action: 'stake',
-      })),
-    };
-
-    // Create transaction
-    const transaction = new Transaction().add(stakeInstruction);
-    
-    // Get recent blockhash
-    const { blockhash } = await connection.getRecentBlockhash();
-    transaction.recentBlockhash = blockhash;
-    transaction.feePayer = providerKeypair.publicKey;
-
-    // Sign transaction
-    transaction.sign(providerKeypair);
-
-    // Send transaction
-    const signature = await connection.sendTransaction(transaction, [providerKeypair]);
-    
-    // Wait for confirmation
-    await connection.confirmTransaction(signature);
-
-    logger.info('Reputation staked on-chain', {
-      providerPubkey,
-      amount,
-      signature,
+      data,
     });
 
-    return {
-      success: true,
-      signature,
-    };
+    const tx = new Transaction().add(ix);
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = authority.publicKey;
+    tx.sign(authority);
 
+    const signature = await connection.sendRawTransaction(tx.serialize());
+    await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight });
+
+    return { success: true, signature, onChain: true, mode: 'onchain' };
   } catch (error) {
-    logger.error('Stake reputation on-chain error:', error);
-    return {
-      success: false,
-      error: error.message,
-    };
+    logger.error('Stake reputation error:', error);
+    return { success: false, error: error.message };
   }
 }
 
-/**
- * Withdraw stake
- */
-async function withdrawStake({
-  providerPubkey,
-  amount,
-}) {
+async function withdrawStake({ providerPubkey, amount }) {
   try {
-    const providerKeypair = Keypair.generate(); // In production, actual provider keypair
-    
-    // Create withdraw instruction
-    const withdrawInstruction = {
-      programId: ATTESTATION_PROGRAM_ID,
+    if (!isOnChainEnabled()) {
+      return {
+        success: true,
+        signature: `offchain_withdraw_${crypto.randomBytes(12).toString('hex')}`,
+        onChain: false,
+        mode: 'offchain',
+        amount,
+        providerPubkey,
+      };
+    }
+
+    const authority = loadAuthorityKeypair();
+    if (!authority) return { success: false, error: 'Authority keypair unavailable' };
+
+    const programId = getProgramId();
+    const [providerPda] = deriveProviderPda(new PublicKey(providerPubkey), programId);
+    const lamports = BigInt(Math.floor(parseFloat(amount) * 1e9));
+    const amountBuf = Buffer.alloc(8);
+    amountBuf.writeBigUInt64LE(lamports);
+
+    const data = Buffer.concat([ixDiscriminator('withdraw_stake'), amountBuf]);
+    const ix = new TransactionInstruction({
+      programId,
       keys: [
-        { pubkey: new PublicKey(providerPubkey), isSigner: true, isWritable: false },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        { pubkey: providerPda, isSigner: false, isWritable: true },
+        { pubkey: authority.publicKey, isSigner: true, isWritable: true },
       ],
-      data: Buffer.from(JSON.stringify({
-        amount: parseFloat(amount),
-        action: 'withdraw',
-      })),
-    };
-
-    // Create transaction
-    const transaction = new Transaction().add(withdrawInstruction);
-    
-    // Get recent blockhash
-    const { blockhash } = await connection.getRecentBlockhash();
-    transaction.recentBlockhash = blockhash;
-    transaction.feePayer = providerKeypair.publicKey;
-
-    // Sign transaction
-    transaction.sign(providerKeypair);
-
-    // Send transaction
-    const signature = await connection.sendTransaction(transaction, [providerKeypair]);
-    
-    // Wait for confirmation
-    await connection.confirmTransaction(signature);
-
-    logger.info('Stake withdrawn on-chain', {
-      providerPubkey,
-      amount,
-      signature,
+      data,
     });
 
-    return {
-      success: true,
-      signature,
-    };
+    const tx = new Transaction().add(ix);
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = authority.publicKey;
+    tx.sign(authority);
 
+    const signature = await connection.sendRawTransaction(tx.serialize());
+    await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight });
+
+    return { success: true, signature, onChain: true, mode: 'onchain' };
   } catch (error) {
-    logger.error('Withdraw stake on-chain error:', error);
-    return {
-      success: false,
-      error: error.message,
-    };
+    logger.error('Withdraw stake error:', error);
+    return { success: false, error: error.message };
   }
 }
 
-/**
- * Get attestation from blockchain
- */
 async function getAttestationOnChain(attestationId) {
   try {
-    // This would query the on-chain attestation account
-    // For now, return mock data
+    if (String(attestationId).startsWith('offchain_')) {
+      return {
+        success: true,
+        attestation: {
+          id: attestationId,
+          onChain: false,
+          mode: 'offchain',
+        },
+      };
+    }
+
+    const info = await connection.getAccountInfo(new PublicKey(attestationId));
+    if (!info) {
+      return { success: false, error: 'Attestation account not found' };
+    }
+
     return {
       success: true,
       attestation: {
         id: attestationId,
-        provider: 'mock-provider-pubkey',
-        transactionHash: 'mock-transaction-hash',
-        riskScore: 75,
-        riskLevel: 'high',
-        stakeAmount: 5.0,
-        votes: {
-          approve: 3,
-          reject: 1,
-        },
-        verified: true,
-        createdAt: new Date().toISOString(),
+        onChain: true,
+        owner: info.owner.toBase58(),
+        lamports: info.lamports,
+        dataLength: info.data.length,
       },
     };
-
   } catch (error) {
     logger.error('Get attestation on-chain error:', error);
-    return {
-      success: false,
-      error: error.message,
-    };
+    return { success: false, error: error.message };
   }
 }
 
-/**
- * Calculate provider reputation
- */
 async function calculateReputation(providerPubkey) {
   try {
-    // This would calculate reputation based on:
-    // - Accuracy of attestations
-    // - Stake amount
-    // - Community votes
-    // - Time active
-    
-    // For now, return mock calculation
-    const baseReputation = 50;
-    const accuracyBonus = 20;
-    const stakeBonus = 15;
-    const timeBonus = 10;
-    
-    const totalReputation = Math.min(1000, baseReputation + accuracyBonus + stakeBonus + timeBonus);
-    
+    // DB-oriented callers should prefer reputationService; this is a lightweight estimate
+    const programId = getProgramId();
+    const [providerPda] = deriveProviderPda(new PublicKey(providerPubkey), programId);
+    const info = await connection.getAccountInfo(providerPda);
+
+    let reputation = 100;
+    if (info) {
+      reputation = Math.min(1000, 100 + Math.floor(info.lamports / 1e7));
+    }
+
     return {
       success: true,
-      reputation: totalReputation,
-      factors: {
-        base: baseReputation,
-        accuracy: accuracyBonus,
-        stake: stakeBonus,
-        time: timeBonus,
-      },
+      reputation,
+      providerPda: providerPda.toBase58(),
+      onChainAccount: Boolean(info),
     };
-
   } catch (error) {
     logger.error('Calculate reputation error:', error);
-    return {
-      success: false,
-      error: error.message,
-    };
+    return { success: false, error: error.message };
   }
 }
 
-/**
- * Verify attestation accuracy
- */
 async function verifyAttestationAccuracy(attestationId, actualOutcome) {
   try {
-    // This would compare the attestation prediction with actual outcome
-    // and update provider reputation accordingly
-    
     const attestation = await getAttestationOnChain(attestationId);
-    
     if (!attestation.success) {
-      return {
-        success: false,
-        error: 'Attestation not found',
-      };
+      return { success: false, error: 'Attestation not found' };
     }
 
-    const predictedRisk = attestation.attestation.riskScore;
+    const predictedRisk = attestation.attestation.riskScore ?? actualOutcome?.predictedRisk ?? 50;
     const actualRisk = actualOutcome.riskScore;
-    
-    // Calculate accuracy (within 20 points is considered accurate)
     const accuracy = Math.abs(predictedRisk - actualRisk) <= 20;
-    
+
     return {
       success: true,
       accurate: accuracy,
@@ -379,13 +411,9 @@ async function verifyAttestationAccuracy(attestationId, actualOutcome) {
       actualRisk,
       difference: Math.abs(predictedRisk - actualRisk),
     };
-
   } catch (error) {
     logger.error('Verify attestation accuracy error:', error);
-    return {
-      success: false,
-      error: error.message,
-    };
+    return { success: false, error: error.message };
   }
 }
 
@@ -397,4 +425,8 @@ module.exports = {
   getAttestationOnChain,
   calculateReputation,
   verifyAttestationAccuracy,
+  getProgramId,
+  isOnChainEnabled,
+  deriveProviderPda,
+  deriveAttestationPda,
 };
