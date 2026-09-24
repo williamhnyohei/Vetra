@@ -19,7 +19,7 @@ class SettingsService {
   private API_BASE_URL: string;
 
   private constructor() {
-    this.API_BASE_URL = import.meta.env.VITE_API_URL || 'https://vetra-production.up.railway.app/api';
+    this.API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
   }
 
   public static getInstance(): SettingsService {
