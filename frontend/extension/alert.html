@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vetra — High Risk Alert</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #121212;
+        --card: #1e1e1e;
+        --text: #e6e6e6;
+        --muted: #858c94;
+        --danger: #da291c;
+        --ok: #00d386;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+      .card {
+        width: 100%;
+        max-width: 400px;
+        background: var(--card);
+        border-radius: 12px;
+        padding: 24px;
+      }
+      h1 { margin: 0 0 8px; font-size: 18px; }
+      .score {
+        font-size: 40px;
+        font-weight: 700;
+        color: var(--danger);
+        margin: 12px 0;
+      }
+      .muted { color: var(--muted); font-size: 13px; line-height: 1.4; }
+      ul { padding-left: 18px; margin: 12px 0 20px; }
+      li { margin-bottom: 6px; font-size: 13px; }
+      .actions { display: flex; gap: 10px; }
+      button {
+        flex: 1;
+        border: 0;
+        border-radius: 8px;
+        height: 44px;
+        font-size: 14px;
+        cursor: pointer;
+        color: #fff;
+      }
+      .block { background: var(--danger); }
+      .allow { background: var(--ok); color: #0b0b0b; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1 id="title">Vetra: alto risco detectado</h1>
+      <div class="score" id="score">—</div>
+      <p class="muted" id="level">Analisando…</p>
+      <ul id="reasons"></ul>
+      <div class="actions">
+        <button class="block" id="btn-block">Block</button>
+        <button class="allow" id="btn-allow">Allow anyway</button>
+      </div>
+    </div>
+    <script src="./alert.js"></script>
+  </body>
+</html>
