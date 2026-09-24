@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/auth-store';
 import { useLanguageStore } from '../../store/language-store';
 import { useThemeStore } from '../../store/theme-store';
+import { useSettingsStore } from '../../store/settings-store';
 import { t } from '../../i18n';
 import SettingsService, { UserSettings } from '../../services/settings-service';
 
@@ -9,11 +10,70 @@ interface SettingsProps {
   onBack?: () => void;
 }
 
+/** Toggle with thumb on the right when on + smooth slide (avoids broken global CSS transforms). */
+function SettingsToggle({
+  on,
+  onChange,
+  disabled,
+}: {
+  on: boolean;
+  onChange: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      disabled={disabled}
+      onClick={onChange}
+      className="shrink-0"
+      style={{
+        width: 48,
+        height: 24,
+        borderRadius: 9999,
+        backgroundColor: on ? '#FBB500' : '#4B5563',
+        transition: 'background-color 200ms ease',
+        padding: 2,
+        border: 'none',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.5 : 1,
+        flexShrink: 0,
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          display: 'block',
+          width: 20,
+          height: 20,
+          borderRadius: '50%',
+          backgroundColor: '#FFFFFF',
+          transform: on ? 'translateX(24px)' : 'translateX(0px)',
+          transition: 'transform 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.35)',
+        }}
+      />
+    </button>
+  );
+}
+
 const Settings: React.FC<SettingsProps> = ({ onBack }) => {
   const { user, logout, loginWithGoogle } = useAuthStore();
   const { language, setLanguage } = useLanguageStore();
   const { theme, setTheme } = useThemeStore();
+  const {
+    openaiApiKey,
+    openaiEnrichment,
+    updateSettings,
+  } = useSettingsStore();
+  const [openaiKeyDraft, setOpenaiKeyDraft] = useState(openaiApiKey || '');
   const [soundAlerts, setSoundAlerts] = useState(true);
+
+  useEffect(() => {
+    setOpenaiKeyDraft(openaiApiKey || '');
+  }, [openaiApiKey]);
+
   const [shareInsights, setShareInsights] = useState(true);
   const [transactionMemory, setTransactionMemory] = useState(false);
   const [smartContractFingerprints, setSmartContractFingerprints] = useState(false);
@@ -284,6 +344,51 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
           </h3>
           
           <div className="space-y-4">
+            {/* OpenAI API key */}
+            <div className="space-y-2">
+              <div>
+                <p
+                  style={{
+                    fontFamily: 'Arial',
+                    fontWeight: '400',
+                    fontSize: '14px',
+                    lineHeight: '20px',
+                    color: '#E6E6E6',
+                  }}
+                >
+                  OpenAI API key
+                </p>
+                <p
+                  style={{
+                    fontFamily: 'Arial',
+                    fontSize: '12px',
+                    lineHeight: '16px',
+                    color: '#858C94',
+                  }}
+                >
+                  Usada só neste dispositivo para gerar motivos da análise. Não é enviada ao backend Vetra.
+                </p>
+              </div>
+              <input
+                type="password"
+                value={openaiKeyDraft}
+                placeholder="sk-..."
+                onChange={(e) => setOpenaiKeyDraft(e.target.value)}
+                onBlur={() =>
+                  updateSettings({ openaiApiKey: openaiKeyDraft.trim() })
+                }
+                className="w-full bg-dark-bg border border-dark-border rounded px-3 py-2"
+                style={{ color: '#E6E6E6', fontSize: 14 }}
+              />
+              <div className="flex items-center justify-between">
+                <p style={{ color: '#E6E6E6', fontSize: 14 }}>Enriquecer motivos com IA</p>
+                <SettingsToggle
+                  on={!!openaiEnrichment}
+                  onChange={() => updateSettings({ openaiEnrichment: !openaiEnrichment })}
+                />
+              </div>
+            </div>
+
             {/* Theme */}
             <div className="flex items-center justify-between">
               <div>
@@ -360,22 +465,14 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                   {t('settings.soundAlertsDescription', language)}
                 </p>
               </div>
-              <button
-                className={`w-12 h-6 rounded-full transition-colors ${
-                  soundAlerts ? 'bg-yellow-500' : 'bg-gray-600'
-                }`}
-                onClick={() => {
+              <SettingsToggle
+                on={soundAlerts}
+                onChange={() => {
                   const newValue = !soundAlerts;
                   setSoundAlerts(newValue);
                   saveSettingToBackend('soundAlerts', newValue);
                 }}
-              >
-                <div
-                  className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                    soundAlerts ? 'translate-x-6' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
+              />
             </div>
 
             {/* Language */}
@@ -631,22 +728,14 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                 {t('settings.shareInsightsDescription', language)}
               </p>
             </div>
-            <button
-              className={`w-12 h-6 rounded-full transition-colors ${
-                shareInsights ? 'bg-yellow-500' : 'bg-gray-600'
-              }`}
-              onClick={() => {
+            <SettingsToggle
+              on={shareInsights}
+              onChange={() => {
                 const newValue = !shareInsights;
                 setShareInsights(newValue);
                 saveSettingToBackend('shareInsights', newValue);
               }}
-            >
-              <div
-                className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                  shareInsights ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
+            />
           </div>
 
           {/* Transaction Memory */}
@@ -691,22 +780,14 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                 {t('settings.transactionMemoryDescription', language)}
               </p>
             </div>
-            <button
-              className={`w-12 h-6 rounded-full transition-colors ${
-                transactionMemory ? 'bg-yellow-500' : 'bg-gray-600'
-              }`}
-              onClick={() => {
+            <SettingsToggle
+              on={transactionMemory}
+              onChange={() => {
                 const newValue = !transactionMemory;
                 setTransactionMemory(newValue);
                 saveSettingToBackend('transactionMemory', newValue);
               }}
-            >
-              <div
-                className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                  transactionMemory ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
+            />
           </div>
 
           {/* Smart Contract fingerprints */}
@@ -737,22 +818,14 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                 {t('settings.smartContractFingerprintsDescription', language)}
               </p>
             </div>
-            <button
-              className={`w-12 h-6 rounded-full transition-colors ${
-                smartContractFingerprints ? 'bg-yellow-500' : 'bg-gray-600'
-              }`}
-              onClick={() => {
+            <SettingsToggle
+              on={smartContractFingerprints}
+              onChange={() => {
                 const newValue = !smartContractFingerprints;
                 setSmartContractFingerprints(newValue);
                 saveSettingToBackend('smartContractFingerprints', newValue);
               }}
-            >
-              <div
-                className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                  smartContractFingerprints ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
+            />
           </div>
         </div>
       </div>
