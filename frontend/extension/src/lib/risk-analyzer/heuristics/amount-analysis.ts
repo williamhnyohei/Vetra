@@ -1,5 +1,6 @@
 /**
- * Amount Analysis - Analisa valores das transações
+ * Amount Analysis — large SOL transfers raise risk
+ * riskScore: additive 0–25
  */
 
 export interface AmountAnalysisResult {
@@ -9,23 +10,37 @@ export interface AmountAnalysisResult {
   reason?: string;
 }
 
-/**
- * Analisa o valor da transação
- */
 export async function analyzeAmount(amountLamports: number): Promise<AmountAnalysisResult> {
-  // TODO: Implementar análise de valor
-  // - Comparar com histórico do usuário
-  // - Detectar valores suspeitos
-  // - Alertar sobre valores muito altos
-  
   const amountSol = amountLamports / 1e9;
-  const isLarge = amountSol > 10; // Exemplo: > 10 SOL
-  
-  return {
-    isUnusual: false,
-    isLarge,
-    riskScore: isLarge ? 30 : 80,
-    reason: isLarge ? 'Large transaction amount' : undefined,
-  };
-}
 
+  if (!Number.isFinite(amountSol) || amountSol <= 0) {
+    return { isUnusual: false, isLarge: false, riskScore: 0 };
+  }
+
+  if (amountSol >= 100) {
+    return {
+      isUnusual: true,
+      isLarge: true,
+      riskScore: 25,
+      reason: `Very large transfer: ${amountSol.toFixed(2)} SOL`,
+    };
+  }
+  if (amountSol >= 10) {
+    return {
+      isUnusual: true,
+      isLarge: true,
+      riskScore: 15,
+      reason: `Large transfer: ${amountSol.toFixed(2)} SOL`,
+    };
+  }
+  if (amountSol >= 1) {
+    return {
+      isUnusual: false,
+      isLarge: false,
+      riskScore: 5,
+      reason: `Transfer of ${amountSol.toFixed(2)} SOL`,
+    };
+  }
+
+  return { isUnusual: false, isLarge: false, riskScore: 0 };
+}

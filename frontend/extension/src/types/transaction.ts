@@ -22,6 +22,8 @@ export interface RiskAnalysis {
     accountReputation: number;
     amountAnalysis: boolean;
   };
+  /** How the numeric score was composed (for UI transparency). */
+  scoreBreakdown?: Array<{ factor: string; points: number; detail?: string }>;
 }
 
 export interface Attestation {

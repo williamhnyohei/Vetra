@@ -1,6 +1,6 @@
 /**
- * Scam Patterns Check - Verifica padrões conhecidos de golpes
- * BP: "Blacklist/similaridade com padrões de scams conhecidos"
+ * Scam Patterns — denylist + lookalike names
+ * riskScore: additive 0–50
  */
 
 import type { PublicKey } from '@solana/web3.js';
@@ -13,60 +13,59 @@ export interface ScamPatternsResult {
   reason: string;
 }
 
-/**
- * Verifica se token/contrato está em blacklist ou segue padrões de scams
- */
+/** Known scam addresses (extend via threat intel) */
+const ADDRESS_DENYLIST = new Set<string>([]);
+
 export async function checkScamPatterns(
   address: PublicKey,
-  metadata?: any
+  metadata?: { name?: string; symbol?: string }
 ): Promise<ScamPatternsResult> {
-  // TODO: Implementar verificação real
-  // - Consultar blacklists conhecidas (RugCheck, Solscan, etc)
-  // - Verificar padrões comuns de scams:
-  //   * Nome similar a tokens famosos
-  //   * Metadata suspeita
-  //   * Contratos copiados
-  //   * Histórico de creator
-  
+  const addr = address.toBase58();
   const suspiciousPatterns: string[] = [];
-  
-  // Mock: verificações básicas
-  const isBlacklisted = false;
-  const matchesKnownScam = false;
-  
-  // Exemplo: verificar nome suspeito
+
+  if (ADDRESS_DENYLIST.has(addr)) {
+    return {
+      isBlacklisted: true,
+      matchesKnownScam: true,
+      suspiciousPatterns: ['denylist'],
+      riskScore: 50,
+      reason: '🚨 Address is on the local scam denylist',
+    };
+  }
+
   if (metadata?.name) {
-    const suspiciousNames = ['USDT', 'USDC', 'SOL', 'BTC', 'ETH'];
-    const isSuspicious = suspiciousNames.some(name => 
-      metadata.name.toUpperCase().includes(name) && 
-      metadata.name !== name
+    const suspiciousNames = ['USDT', 'USDC', 'SOL', 'BTC', 'ETH', 'BONK'];
+    const upper = metadata.name.toUpperCase();
+    const isLookalike = suspiciousNames.some(
+      (name) => upper.includes(name) && upper !== name && metadata.name !== name
     );
-    if (isSuspicious) {
-      suspiciousPatterns.push('Nome similar a token famoso');
+    if (isLookalike) {
+      suspiciousPatterns.push('Name similar to a well-known token');
     }
   }
-  
-  let riskScore = 80;
-  let reason = 'Nenhum padrão de golpe detectado';
-  
-  if (isBlacklisted) {
-    riskScore = 0;
-    reason = '🚨 BLOQUEADO: Token está em BLACKLIST conhecida!';
-  } else if (matchesKnownScam) {
-    riskScore = 15;
-    reason = '🚨 PERIGO: Padrão similar a golpes conhecidos!';
-  } else if (suspiciousPatterns.length > 0) {
-    riskScore = 40;
-    reason = `⚠️ Atenção: ${suspiciousPatterns.join(', ')}`;
+
+  if (metadata?.symbol) {
+    const sym = metadata.symbol.toUpperCase();
+    if (['USDT', 'USDC', 'SOL'].includes(sym) && !ADDRESS_DENYLIST.has(addr)) {
+      // Symbol alone isn't enough; mild bump if mint unknown handled elsewhere
+    }
   }
-  
+
+  if (suspiciousPatterns.length > 0) {
+    return {
+      isBlacklisted: false,
+      matchesKnownScam: true,
+      suspiciousPatterns,
+      riskScore: 25,
+      reason: `⚠️ ${suspiciousPatterns.join(', ')}`,
+    };
+  }
+
   return {
-    isBlacklisted,
-    matchesKnownScam,
-    suspiciousPatterns,
-    riskScore,
-    reason,
+    isBlacklisted: false,
+    matchesKnownScam: false,
+    suspiciousPatterns: [],
+    riskScore: 0,
+    reason: 'No scam patterns detected',
   };
 }
-
-
